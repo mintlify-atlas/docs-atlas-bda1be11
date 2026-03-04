@@ -1,0 +1,450 @@
+---
+title: 'authInterceptor'
+description: 'HTTP interceptor for automatic token injection and error handling'
+icon: 'arrows-left-right'
+---
+
+## Overview
+
+The `authInterceptor` is a functional HTTP interceptor that automatically attaches authentication tokens to outgoing HTTP requests and handles authentication errors. It ensures all API calls include proper authorization headers and gracefully manages 401 Unauthorized responses.
+
+<Info>
+  This interceptor uses Angular's modern functional interceptor API introduced in Angular 15+, replacing the class-based `HttpInterceptor` interface.
+</Info>
+
+## Implementation
+
+### Source Code
+
+```typescript
+import { HttpInterceptorFn } from '@angular/common/http';
+import { inject } from '@angular/core';
+import { AuthService } from '../services/auth.service';
+import { Router } from '@angular/router';
+import { catchError } from 'rxjs/operators';
+import { throwError } from 'rxjs';
+
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  const token = authService.getToken();
+
+  let authReq = req;
+
+  if (token) {
+    authReq = req.clone({
+      setHeaders: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+  }
+
+  return next(authReq).pipe(
+    catchError(error => {
+      if (error.status === 401) {
+        authService.logout();
+        router.navigate(['/login']);
+      }
+
+      return throwError(() => error);
+    })
+  );
+};
+```
+
+### How It Works
+
+<Steps>
+  <Step title="Inject Dependencies">
+    The interceptor uses Angular's `inject()` function to obtain instances of `AuthService` and `Router`.
+  </Step>
+  
+  <Step title="Retrieve Token">
+    Calls `authService.getToken()` to get the current authentication token from storage.
+  </Step>
+  
+  <Step title="Clone and Modify Request">
+    If a token exists, clones the original request and adds an `Authorization` header with the Bearer token.
+  </Step>
+  
+  <Step title="Forward Request">
+    Passes the modified (or original) request to the next handler in the chain.
+  </Step>
+  
+  <Step title="Handle Errors">
+    Catches HTTP errors, specifically handling 401 Unauthorized by logging out the user and redirecting to login.
+  </Step>
+</Steps>
+
+## Usage
+
+### Global Registration
+
+Register the interceptor in your application configuration:
+
+```typescript
+import { ApplicationConfig } from '@angular/core';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { authInterceptor } from './interceptors/auth-interceptor';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideHttpClient(
+      withInterceptors([authInterceptor])
+    )
+  ]
+};
+```
+
+### Standalone Component
+
+For standalone components or modules:
+
+```typescript
+import { bootstrapApplication } from '@angular/platform-browser';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { authInterceptor } from './app/interceptors/auth-interceptor';
+import { AppComponent } from './app/app.component';
+
+bootstrapApplication(AppComponent, {
+  providers: [
+    provideHttpClient(
+      withInterceptors([authInterceptor])
+    )
+  ]
+});
+```
+
+### Multiple Interceptors
+
+Chain multiple interceptors in order of execution:
+
+```typescript
+import { authInterceptor } from './interceptors/auth-interceptor';
+import { loggingInterceptor } from './interceptors/logging-interceptor';
+import { errorInterceptor } from './interceptors/error-interceptor';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideHttpClient(
+      withInterceptors([
+        authInterceptor,
+        loggingInterceptor,
+        errorInterceptor
+      ])
+    )
+  ]
+};
+```
+
+## Request Flow
+
+<CodeGroup>
+
+```mermaid Diagram
+sequenceDiagram
+    participant Component
+    participant HttpClient
+    participant authInterceptor
+    participant AuthService
+    participant API
+    participant Router
+
+    Component->>HttpClient: Make HTTP request
+    HttpClient->>authInterceptor: Intercept request
+    authInterceptor->>AuthService: getToken()
+    AuthService-->>authInterceptor: Return token
+    
+    alt Token exists
+        authInterceptor->>authInterceptor: Clone request with Bearer token
+    end
+    
+    authInterceptor->>API: Forward request
+    
+    alt Success (200-299)
+        API-->>authInterceptor: Response
+        authInterceptor-->>Component: Return response
+    else Unauthorized (401)
+        API-->>authInterceptor: 401 Error
+        authInterceptor->>AuthService: logout()
+        authInterceptor->>Router: Navigate to /login
+        authInterceptor-->>Component: Throw error
+    else Other errors
+        API-->>authInterceptor: Error
+        authInterceptor-->>Component: Throw error
+    end
+```
+
+</CodeGroup>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Automatic Token Injection" icon="key">
+    Seamlessly adds Bearer tokens to all HTTP requests without manual header management.
+  </Card>
+  
+  <Card title="Error Handling" icon="triangle-exclamation">
+    Automatically detects and handles 401 Unauthorized responses with logout and redirect.
+  </Card>
+  
+  <Card title="Immutable Requests" icon="lock">
+    Uses `req.clone()` to preserve the original request object, following Angular best practices.
+  </Card>
+  
+  <Card title="Reactive Design" icon="bolt">
+    Leverages RxJS operators for clean, composable error handling logic.
+  </Card>
+</CardGroup>
+
+## Request Modification
+
+The interceptor modifies requests by adding the Authorization header:
+
+<CodeGroup>
+
+```typescript Before Interception
+GET /api/tasks HTTP/1.1
+Host: api.example.com
+Content-Type: application/json
+```
+
+```typescript After Interception
+GET /api/tasks HTTP/1.1
+Host: api.example.com
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+</CodeGroup>
+
+## Error Handling
+
+### 401 Unauthorized Flow
+
+When the API returns a 401 status:
+
+1. The interceptor catches the error
+2. Calls `authService.logout()` to clear local authentication state
+3. Navigates to `/login` page
+4. Re-throws the error for component-level handling if needed
+
+<Warning>
+  The interceptor re-throws errors after handling them. Components should still implement proper error handling in their subscriptions.
+</Warning>
+
+### Component Error Handling
+
+Even with the interceptor, implement error handling in components:
+
+```typescript
+import { Component } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+
+export class TasksComponent {
+  constructor(private http: HttpClient) {}
+
+  loadTasks(): void {
+    this.http.get('/api/tasks').subscribe({
+      next: (tasks) => {
+        // Handle successful response
+        console.log('Tasks loaded:', tasks);
+      },
+      error: (error) => {
+        // Handle error (user already redirected if 401)
+        if (error.status !== 401) {
+          console.error('Failed to load tasks:', error);
+          // Show user-friendly error message
+        }
+      }
+    });
+  }
+}
+```
+
+## Related Components
+
+<CardGroup cols={2}>
+  <Card title="AuthService" icon="key" href="/api/auth-service">
+    Manages authentication tokens and user sessions
+  </Card>
+  
+  <Card title="authGuard" icon="shield-check" href="/api/auth-guard">
+    Protects routes from unauthorized access
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Tip>
+  The interceptor automatically handles all HTTP requests. You don't need to manually add Authorization headers in your services.
+</Tip>
+
+<Note>
+  The interceptor only adds the Authorization header when a token exists. Requests to public endpoints (like login) will pass through unchanged.
+</Note>
+
+### Excluding Specific Requests
+
+If you need to exclude certain requests from token injection, modify the interceptor:
+
+```typescript
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  // Skip auth for public endpoints
+  const publicEndpoints = ['/api/public', '/api/login', '/api/register'];
+  const isPublic = publicEndpoints.some(url => req.url.includes(url));
+
+  if (isPublic) {
+    return next(req);
+  }
+
+  const token = authService.getToken();
+  let authReq = req;
+
+  if (token) {
+    authReq = req.clone({
+      setHeaders: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+  }
+
+  return next(authReq).pipe(
+    catchError(error => {
+      if (error.status === 401) {
+        authService.logout();
+        router.navigate(['/login']);
+      }
+      return throwError(() => error);
+    })
+  );
+};
+```
+
+### Testing
+
+Example unit test for the auth interceptor:
+
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { HttpInterceptorFn, HttpRequest, HttpResponse } from '@angular/common/http';
+import { authInterceptor } from './auth-interceptor';
+import { AuthService } from '../services/auth.service';
+import { Router } from '@angular/router';
+import { of, throwError } from 'rxjs';
+
+describe('authInterceptor', () => {
+  let authService: jasmine.SpyObj<AuthService>;
+  let router: jasmine.SpyObj<Router>;
+
+  beforeEach(() => {
+    const authServiceSpy = jasmine.createSpyObj('AuthService', ['getToken', 'logout']);
+    const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: AuthService, useValue: authServiceSpy },
+        { provide: Router, useValue: routerSpy }
+      ]
+    });
+
+    authService = TestBed.inject(AuthService) as jasmine.SpyObj<AuthService>;
+    router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+  });
+
+  it('should add Authorization header when token exists', (done) => {
+    const token = 'test-token-123';
+    authService.getToken.and.returnValue(token);
+
+    const req = new HttpRequest('GET', '/api/tasks');
+    const next = jasmine.createSpy('next').and.returnValue(of(new HttpResponse({ status: 200 })));
+
+    TestBed.runInInjectionContext(() => {
+      authInterceptor(req, next).subscribe(() => {
+        const modifiedReq = next.calls.mostRecent().args[0];
+        expect(modifiedReq.headers.get('Authorization')).toBe(`Bearer ${token}`);
+        done();
+      });
+    });
+  });
+
+  it('should handle 401 error by logging out and redirecting', (done) => {
+    const token = 'test-token-123';
+    authService.getToken.and.returnValue(token);
+
+    const req = new HttpRequest('GET', '/api/tasks');
+    const error = { status: 401, message: 'Unauthorized' };
+    const next = jasmine.createSpy('next').and.returnValue(throwError(() => error));
+
+    TestBed.runInInjectionContext(() => {
+      authInterceptor(req, next).subscribe({
+        error: () => {
+          expect(authService.logout).toHaveBeenCalled();
+          expect(router.navigate).toHaveBeenCalledWith(['/login']);
+          done();
+        }
+      });
+    });
+  });
+});
+```
+
+## Common Scenarios
+
+### Refreshing Expired Tokens
+
+Extend the interceptor to handle token refresh:
+
+```typescript
+import { HttpInterceptorFn } from '@angular/common/http';
+import { inject } from '@angular/core';
+import { AuthService } from '../services/auth.service';
+import { catchError, switchMap } from 'rxjs/operators';
+import { throwError } from 'rxjs';
+
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const authService = inject(AuthService);
+  const token = authService.getToken();
+
+  let authReq = req;
+  if (token) {
+    authReq = req.clone({
+      setHeaders: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  return next(authReq).pipe(
+    catchError(error => {
+      if (error.status === 401 && !req.url.includes('/refresh')) {
+        // Attempt to refresh token
+        return authService.refreshToken().pipe(
+          switchMap(newToken => {
+            // Retry request with new token
+            const retryReq = req.clone({
+              setHeaders: { Authorization: `Bearer ${newToken}` }
+            });
+            return next(retryReq);
+          }),
+          catchError(refreshError => {
+            // Refresh failed, logout
+            authService.logout();
+            return throwError(() => refreshError);
+          })
+        );
+      }
+      return throwError(() => error);
+    })
+  );
+};
+```
+
+## See Also
+
+- [Angular HTTP Interceptors Documentation](https://angular.io/guide/http-intercept-requests-and-responses)
+- [Functional Interceptors in Angular](https://angular.io/guide/http-functional-interceptors)
+- [RxJS Error Handling](https://rxjs.dev/guide/error-handling)
+- [Authentication Guide](/core/authentication)

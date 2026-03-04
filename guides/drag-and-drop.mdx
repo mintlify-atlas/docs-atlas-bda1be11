@@ -1,0 +1,676 @@
+---
+title: Drag and Drop
+description: Comprehensive guide to implementing Angular CDK drag-and-drop for TaskFlow tasks
+---
+
+TaskFlow uses Angular CDK's drag-and-drop module to enable intuitive task movement between columns. This guide covers the complete implementation of drag-and-drop functionality.
+
+## Overview
+
+The drag-and-drop system allows users to:
+
+- Drag tasks within the same column to reorder them
+- Move tasks between different columns
+- Automatically update task positions in the backend
+- Maintain smooth animations during drag operations
+
+## Installation
+
+First, ensure Angular CDK is installed:
+
+```bash
+npm install @angular/cdk
+```
+
+## Setting Up Drag-and-Drop
+
+<Steps>
+  <Step title="Import CDK Drag-Drop Module">
+    Import the necessary CDK modules in your column component:
+
+    ```typescript
+    import {
+      CdkDrag,
+      CdkDragDrop,
+      CdkDropList,
+      moveItemInArray,
+      transferArrayItem
+    } from '@angular/cdk/drag-drop';
+
+    @Component({
+      selector: 'app-column',
+      imports: [
+        TaskCard,
+        TaskModal,
+        FormsModule,
+        ConfirmModal,
+        CdkDropList,  // Add this
+        CdkDrag        // Add this
+      ],
+      templateUrl: './column.html',
+      styleUrl: './column.css',
+    })
+    export class Column {
+      // Component logic
+    }
+    ```
+  </Step>
+
+  <Step title="Configure Drop List">
+    Add the `cdkDropList` directive to your tasks container:
+
+    ```html
+    <div
+      class="tasks"
+      cdkDropList
+      [id]="column.id.toString()"
+      [cdkDropListData]="column.tasks"
+      [cdkDropListConnectedTo]="connectedTo"
+      (cdkDropListDropped)="drop($event)"
+    >
+      <!-- Tasks will go here -->
+    </div>
+    ```
+
+    **Key properties:**
+    - `cdkDropList`: Marks the container as a drop zone
+    - `[id]`: Unique identifier for the drop list
+    - `[cdkDropListData]`: The array of tasks
+    - `[cdkDropListConnectedTo]`: Array of other drop list IDs
+    - `(cdkDropListDropped)`: Event handler for drop operations
+  </Step>
+
+  <Step title="Make Tasks Draggable">
+    Wrap each task with the `cdkDrag` directive:
+
+    ```html
+    <div
+      class="tasks"
+      cdkDropList
+      [id]="column.id.toString()"
+      [cdkDropListData]="column.tasks"
+      [cdkDropListConnectedTo]="connectedTo"
+      (cdkDropListDropped)="drop($event)"
+    >
+      @for (task of column.tasks; track task.id) {
+        <div cdkDrag [cdkDragData]="task">
+          <app-task-card
+            [task]="task"
+            (click)="openEditModal(task)"
+            (delete)="deleteTask(task.id)">
+          </app-task-card>
+        </div>
+      }
+
+      @if (column.tasks.length === 0) {
+        <p class="empty-state">No tasks</p>
+      }
+    </div>
+    ```
+  </Step>
+
+  <Step title="Connect Drop Lists">
+    Generate a list of connected drop list IDs in the parent component:
+
+    ```typescript
+    // In BoardDetailPage component
+    export class BoardDetailPage {
+      board = signal<Board | null>(null);
+
+      getConnectedColumns(): string[] {
+        const b = this.board();
+        if (!b) return [];
+
+        // Return all column IDs as strings
+        return b.columns.map(c => c.id.toString());
+      }
+    }
+    ```
+
+    Pass this to each column:
+
+    ```html
+    @for (column of board()?.columns; track column.id) {
+      <app-column
+        [column]="column"
+        [connectedTo]="getConnectedColumns()"
+        (taskCreated)="handleTaskCreated($event)"
+        (taskUpdated)="handleTaskUpdated($event)"
+        (taskDeleted)="handleTaskDeleted($event)">
+      </app-column>
+    }
+    ```
+  </Step>
+</Steps>
+
+## Handling Drop Events
+
+The `drop` event handler manages both same-column reordering and cross-column transfers:
+
+<CodeGroup>
+```typescript column.ts
+import { Component, Input, inject } from '@angular/core';
+import { CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
+import { TaskService } from '../../../services/task.service';
+import { TaskItem, TaskColumn } from '../../../services/board.service';
+
+export class Column {
+  @Input() column!: TaskColumn;
+  @Input() connectedTo: string[] = [];
+
+  private taskService = inject(TaskService);
+
+  drop(event: CdkDragDrop<TaskItem[]>) {
+    // Get the task being moved
+    const movedTask = event.item.data as TaskItem;
+
+    if (event.previousContainer === event.container) {
+      // Same column: Reorder tasks
+      moveItemInArray(
+        event.container.data,
+        event.previousIndex,
+        event.currentIndex
+      );
+
+      // Update position in backend
+      this.taskService.moveTask(movedTask.id, {
+        newColumnId: this.column.id,
+        newPosition: event.currentIndex
+      }).subscribe();
+
+    } else {
+      // Different column: Transfer task
+      transferArrayItem(
+        event.previousContainer.data,
+        event.container.data,
+        event.previousIndex,
+        event.currentIndex
+      );
+
+      // Update column and position in backend
+      this.taskService.moveTask(movedTask.id, {
+        newColumnId: this.column.id,
+        newPosition: event.currentIndex
+      }).subscribe();
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Understanding Drop Event Properties
+
+<Tabs>
+  <Tab title="Event Properties">
+    The `CdkDragDrop` event provides:
+
+    ```typescript
+    interface CdkDragDrop<T> {
+      // Previous drop list container
+      previousContainer: CdkDropList<T>;
+      
+      // Current drop list container
+      container: CdkDropList<T>;
+      
+      // Previous index in the list
+      previousIndex: number;
+      
+      // Current index in the list
+      currentIndex: number;
+      
+      // The dragged item element
+      item: CdkDrag<T>;
+    }
+    ```
+  </Tab>
+
+  <Tab title="CDK Helper Functions">
+    Angular CDK provides utility functions:
+
+    ```typescript
+    // Reorder items in the same array
+    moveItemInArray(
+      array: any[],
+      fromIndex: number,
+      toIndex: number
+    )
+
+    // Move item between different arrays
+    transferArrayItem(
+      currentArray: any[],
+      targetArray: any[],
+      currentIndex: number,
+      targetIndex: number
+    )
+    ```
+  </Tab>
+
+  <Tab title="Task Data">
+    Access the task being dragged:
+
+    ```typescript
+    drop(event: CdkDragDrop<TaskItem[]>) {
+      // Get task data from the dragged item
+      const movedTask = event.item.data as TaskItem;
+
+      console.log('Task ID:', movedTask.id);
+      console.log('Task Title:', movedTask.title);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Same Column vs Cross Column
+
+The drop handler distinguishes between two scenarios:
+
+<Tabs>
+  <Tab title="Same Column Reorder">
+    When a task is dragged within the same column:
+
+    ```typescript
+    if (event.previousContainer === event.container) {
+      // Use moveItemInArray to reorder
+      moveItemInArray(
+        event.container.data,
+        event.previousIndex,
+        event.currentIndex
+      );
+
+      // Update only the position
+      this.taskService.moveTask(movedTask.id, {
+        newColumnId: this.column.id,  // Same column
+        newPosition: event.currentIndex
+      }).subscribe();
+    }
+    ```
+
+    **What happens:**
+    1. Task order changes within the same array
+    2. UI updates immediately via `moveItemInArray`
+    3. Backend updates the task position
+  </Tab>
+
+  <Tab title="Cross Column Transfer">
+    When a task is dragged to a different column:
+
+    ```typescript
+    else {
+      // Use transferArrayItem to move between arrays
+      transferArrayItem(
+        event.previousContainer.data,  // Source array
+        event.container.data,           // Target array
+        event.previousIndex,
+        event.currentIndex
+      );
+
+      // Update column and position
+      this.taskService.moveTask(movedTask.id, {
+        newColumnId: this.column.id,  // New column
+        newPosition: event.currentIndex
+      }).subscribe();
+    }
+    ```
+
+    **What happens:**
+    1. Task moves from source to target array
+    2. UI updates immediately via `transferArrayItem`
+    3. Backend updates both column and position
+  </Tab>
+</Tabs>
+
+## Styling Drag States
+
+Customize the appearance during drag operations:
+
+<CodeGroup>
+```css column.css
+/* Container styles */
+.tasks {
+  min-height: 100px;
+  border-radius: 4px;
+  transition: background-color 200ms;
+}
+
+/* Drag placeholder */
+.cdk-drag-placeholder {
+  opacity: 0.3;
+  background: #e0e0e0;
+  border: 2px dashed #999;
+}
+
+/* Item being dragged */
+.cdk-drag-preview {
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  opacity: 0.9;
+  cursor: grabbing;
+  transform: rotate(2deg);
+}
+
+/* Animating item */
+.cdk-drag-animating {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* Drop list during drag */
+.tasks.cdk-drop-list-dragging .task-card:not(.cdk-drag-placeholder) {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* Drop target indicator */
+.tasks.cdk-drop-list-receiving {
+  background-color: #f0f8ff;
+  border: 2px solid #4a90e2;
+}
+```
+</CodeGroup>
+
+## Advanced Features
+
+### Drag Handle
+
+Restrict dragging to a specific handle:
+
+<Tabs>
+  <Tab title="Template">
+    ```html
+    <div cdkDrag [cdkDragData]="task">
+      <app-task-card [task]="task">
+        <button cdkDragHandle class="drag-handle">
+          <span class="material-icons">drag_indicator</span>
+        </button>
+      </app-task-card>
+    </div>
+    ```
+  </Tab>
+
+  <Tab title="Styles">
+    ```css
+    .drag-handle {
+      cursor: grab;
+      padding: 4px;
+      color: #999;
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Drag Disabled State
+
+Conditionally disable dragging:
+
+```html
+<div 
+  cdkDrag 
+  [cdkDragData]="task"
+  [cdkDragDisabled]="!canEditBoard">
+  <app-task-card [task]="task"></app-task-card>
+</div>
+```
+
+### Custom Drag Preview
+
+Customize the dragged element appearance:
+
+```html
+<div cdkDrag [cdkDragData]="task">
+  <app-task-card [task]="task"></app-task-card>
+  
+  <!-- Custom preview template -->
+  <div *cdkDragPreview class="custom-preview">
+    <h4>{{ task.title }}</h4>
+    <span class="dragging-badge">Moving...</span>
+  </div>
+</div>
+```
+
+### Drop Predicate
+
+Control which items can be dropped:
+
+```typescript
+export class Column {
+  canDropTask = (drag: CdkDrag, drop: CdkDropList) => {
+    // Only allow drops if user has permission
+    return this.hasEditPermission;
+  };
+}
+```
+
+```html
+<div
+  cdkDropList
+  [cdkDropListEnterPredicate]="canDropTask"
+  [cdkDropListData]="column.tasks">
+  <!-- Tasks -->
+</div>
+```
+
+## Backend Integration
+
+The `moveTask` API endpoint handles position updates:
+
+<CodeGroup>
+```typescript task.service.ts
+export class TaskService {
+  moveTask(
+    id: number,
+    data: { newColumnId: number; newPosition: number }
+  ) {
+    return this.http.put(`${this.apiUrl}/${id}/move`, data);
+  }
+}
+```
+
+```json API Request
+PUT /api/task/123/move
+{
+  "newColumnId": 5,
+  "newPosition": 2
+}
+```
+</CodeGroup>
+
+## Complete Implementation
+
+Here's the complete column template with drag-and-drop:
+
+<CodeGroup>
+```html column.html
+<div class="column">
+  <!-- Column Header -->
+  <div class="column-header">
+    @if (!editing) {
+      <h3 class="column-title">{{ column.name }}</h3>
+    }
+    @if (editing) {
+      <input
+        type="text"
+        [(ngModel)]="editName"
+        class="column-edit-input"
+      />
+    }
+
+    <div class="column-actions">
+      @if (!editing) {
+        <button (click)="startEdit()">Edit</button>
+      }
+      @if (editing) {
+        <button (click)="saveEdit()">Save</button>
+        <button (click)="cancelEdit()">Cancel</button>
+      }
+      <button (click)="deleteColumn()">Delete</button>
+    </div>
+  </div>
+
+  <!-- Drag-and-Drop Task List -->
+  <div
+    class="tasks"
+    cdkDropList
+    [id]="column.id.toString()"
+    [cdkDropListData]="column.tasks"
+    [cdkDropListConnectedTo]="connectedTo"
+    (cdkDropListDropped)="drop($event)"
+  >
+    @for (task of column.tasks; track task.id) {
+      <div cdkDrag [cdkDragData]="task">
+        <app-task-card
+          [task]="task"
+          (click)="openEditModal(task)"
+          (delete)="deleteTask(task.id)">
+        </app-task-card>
+      </div>
+    }
+
+    @if (column.tasks.length === 0) {
+      <p class="empty-state">No tasks</p>
+    }
+  </div>
+
+  <!-- Add Task Button -->
+  <button class="add-task-btn" (click)="openCreateModal()">
+    + New Task
+  </button>
+
+  <!-- Task Modal -->
+  @if (showModal) {
+    <app-task-modal
+      [task]="selectedTask"
+      [mode]="modalMode"
+      (close)="closeModal()"
+      (save)="handleSave($event)">
+    </app-task-modal>
+  }
+
+  <!-- Confirm Delete Modal -->
+  @if (showConfirmModal) {
+    <app-confirm-modal
+      message="Delete this column and all its tasks?"
+      (confirm)="confirmDeleteColumn()"
+      (cancel)="cancelDelete()">
+    </app-confirm-modal>
+  }
+</div>
+```
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Track By for Performance">
+    Always use `track` with unique IDs in `@for` loops:
+
+    ```html
+    @for (task of column.tasks; track task.id) {
+      <div cdkDrag [cdkDragData]="task">
+        <app-task-card [task]="task"></app-task-card>
+      </div>
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Connect All Drop Lists">
+    Ensure all columns are connected for cross-column dragging:
+
+    ```typescript
+    getConnectedColumns(): string[] {
+      return this.board().columns.map(c => c.id.toString());
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Handle Backend Errors">
+    Add error handling for move operations:
+
+    ```typescript
+    this.taskService.moveTask(movedTask.id, data).subscribe({
+      next: () => {
+        // Success
+      },
+      error: (err) => {
+        // Revert UI changes
+        console.error('Failed to move task:', err);
+      }
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Provide Visual Feedback">
+    Use CSS to indicate valid drop targets and dragging states.
+  </Accordion>
+
+  <Accordion title="Optimize for Touch Devices">
+    Test drag-and-drop on touch devices and add appropriate touch handlers if needed.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Tasks Don't Move Between Columns">
+    **Issue:** Drag-and-drop only works within the same column.
+
+    **Solution:** Ensure `[cdkDropListConnectedTo]` includes all column IDs:
+
+    ```typescript
+    getConnectedColumns(): string[] {
+      return this.board().columns.map(c => c.id.toString());
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Dragged Item Looks Wrong">
+    **Issue:** The drag preview doesn't match the original element.
+
+    **Solution:** Add proper styling for `.cdk-drag-preview`:
+
+    ```css
+    .cdk-drag-preview {
+      box-sizing: border-box;
+      border-radius: 4px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Position Not Saved">
+    **Issue:** Task position resets after page refresh.
+
+    **Solution:** Ensure the backend API is called and completes:
+
+    ```typescript
+    this.taskService.moveTask(movedTask.id, {
+      newColumnId: this.column.id,
+      newPosition: event.currentIndex
+    }).subscribe({
+      next: () => console.log('Position saved'),
+      error: (err) => console.error('Save failed:', err)
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Performance Issues with Many Tasks">
+    **Issue:** Lag when dragging with many tasks.
+
+    **Solution:** Use virtual scrolling with CDK:
+
+    ```bash
+    npm install @angular/cdk/scrolling
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Managing Tasks" icon="list-check" href="/guides/tasks">
+    Learn more about creating and managing tasks
+  </Card>
+  <Card title="Managing Columns" icon="table-columns" href="/guides/columns">
+    Explore advanced column management features
+  </Card>
+</CardGroup>

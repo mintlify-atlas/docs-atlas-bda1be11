@@ -1,0 +1,225 @@
+---
+title: Welcome to TaskFlow Angular
+description: A modern Kanban-style project management application built with Angular standalone components and signals
+mode: custom
+---
+
+<div className="relative bg-gradient-to-br from-[#3b82f6] via-[#2563eb] to-[#1d4ed8] dark:from-[#1e3a8a] dark:via-[#1e40af] dark:to-[#1e3a8a] py-20 overflow-hidden">
+  <div className="absolute inset-0 bg-black/20 dark:bg-black/40"></div>
+  <div className="relative max-w-6xl mx-auto px-6 lg:px-8">
+    <div className="grid lg:grid-cols-12 gap-12 items-center">
+      <div className="lg:col-span-7 space-y-6">
+        <h1 className="text-5xl lg:text-6xl font-bold text-white">
+          TaskFlow Angular
+        </h1>
+        <p className="text-xl text-white/90 max-w-2xl">
+          A powerful Kanban board application built with Angular standalone components, signals, and modern drag-and-drop functionality
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a 
+            href="/quickstart" 
+            className="inline-flex items-center px-6 py-3 rounded-lg bg-white text-[#3b82f6] font-semibold hover:bg-white/90 transition-colors"
+          >
+            Get Started
+          </a>
+          <a 
+            href="/api/auth-service" 
+            className="inline-flex items-center px-6 py-3 rounded-lg border border-white/30 bg-white/10 text-white font-semibold hover:bg-white/20 transition-colors"
+          >
+            Explore API
+          </a>
+        </div>
+      </div>
+      <div className="lg:col-span-5 hidden lg:block">
+        <div className="bg-white/10 dark:bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
+          <div className="space-y-4">
+            <div className="h-12 bg-white/20 rounded-lg"></div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-3">
+                <div className="h-8 bg-white/20 rounded"></div>
+                <div className="h-16 bg-white/30 rounded"></div>
+                <div className="h-12 bg-white/30 rounded"></div>
+              </div>
+              <div className="space-y-3">
+                <div className="h-8 bg-white/20 rounded"></div>
+                <div className="h-12 bg-white/30 rounded"></div>
+                <div className="h-16 bg-white/30 rounded"></div>
+              </div>
+              <div className="space-y-3">
+                <div className="h-8 bg-white/20 rounded"></div>
+                <div className="h-20 bg-white/30 rounded"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Quick Start
+    </h2>
+    <p className="text-lg text-gray-600 dark:text-gray-400">
+      Get your TaskFlow application up and running in minutes
+    </p>
+  </div>
+
+  <Steps>
+    <Step title="Clone the repository">
+      Clone the TaskFlow Angular repository to your local machine:
+      
+      ```bash
+      git clone https://github.com/JoelVM2/TaskFlowAngular.git
+      cd TaskFlowAngular
+      ```
+    </Step>
+    
+    <Step title="Install dependencies">
+      Install all required npm packages including Angular and Angular CDK:
+      
+      ```bash
+      npm install
+      ```
+      
+      This will install Angular 21, Angular CDK for drag-and-drop, RxJS, and all development dependencies.
+    </Step>
+    
+    <Step title="Configure the backend API">
+      Update the API URL in your service files to point to your backend:
+      
+      ```typescript
+      // In src/app/services/*.service.ts
+      private apiUrl = 'https://localhost:7057/api';
+      ```
+      
+      <Note>
+        TaskFlow requires a .NET backend API. Ensure your backend is running before starting the frontend.
+      </Note>
+    </Step>
+    
+    <Step title="Start the development server">
+      Run the Angular development server:
+      
+      ```bash
+      ng serve
+      ```
+      
+      Your application will be available at `http://localhost:4200`
+    </Step>
+  </Steps>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Key Features
+    </h2>
+    <p className="text-lg text-gray-600 dark:text-gray-400">
+      Everything you need to build collaborative Kanban boards
+    </p>
+  </div>
+
+  <CardGroup cols={2}>
+    <Card title="Modern Angular Architecture" icon="angular" href="/core/architecture">
+      Built with Angular 21 standalone components and signals for reactive state management
+    </Card>
+    <Card title="JWT Authentication" icon="lock" href="/core/authentication">
+      Secure authentication with JWT tokens, route guards, and HTTP interceptors
+    </Card>
+    <Card title="Drag & Drop Interface" icon="hand" href="/guides/drag-and-drop">
+      Intuitive drag-and-drop powered by Angular CDK for seamless task management
+    </Card>
+    <Card title="Collaborative Boards" icon="users" href="/guides/boards">
+      Share boards with team members using join codes for real-time collaboration
+    </Card>
+    <Card title="Component Library" icon="cubes" href="/components/layout">
+      Reusable, well-structured components for layout, tasks, and UI elements
+    </Card>
+    <Card title="Type-Safe Services" icon="code" href="/api/board-service">
+      Fully typed Angular services with TypeScript interfaces for all data models
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Explore by Topic
+    </h2>
+    <p className="text-lg text-gray-600 dark:text-gray-400">
+      Deep dive into TaskFlow's capabilities
+    </p>
+  </div>
+
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <a 
+      href="/guides/boards" 
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#3b82f6] dark:hover:border-[#3b82f6] overflow-hidden transition-colors no-underline bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="h-56 overflow-hidden flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/20">
+        <svg className="w-24 h-24 text-[#3b82f6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+        </svg>
+      </div>
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
+          Board Management
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Learn how to create, edit, and share Kanban boards with your team
+        </p>
+        <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-[#3b82f6]">
+          Explore boards
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a 
+      href="/guides/drag-and-drop" 
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#3b82f6] dark:hover:border-[#3b82f6] overflow-hidden transition-colors no-underline bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="h-56 overflow-hidden flex items-center justify-center bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/20">
+        <svg className="w-24 h-24 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      </div>
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
+          Drag & Drop
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Master the Angular CDK drag-and-drop implementation for tasks and columns
+        </p>
+        <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-[#3b82f6]">
+          Learn drag & drop
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl bg-gradient-to-r from-[#3b82f6] to-[#2563eb] dark:from-[#1e40af] dark:to-[#1e3a8a] p-12 text-center">
+    <h2 className="text-3xl font-bold text-white mb-4">
+      Ready to build your Kanban board?
+    </h2>
+    <p className="text-lg text-white/90 mb-8 max-w-2xl mx-auto">
+      Get started with TaskFlow and create collaborative project management workflows
+    </p>
+    <a 
+      href="/quickstart" 
+      className="inline-flex items-center px-8 py-3 rounded-lg bg-white text-[#3b82f6] font-semibold hover:bg-white/90 transition-colors"
+    >
+      Start Building Now
+    </a>
+  </div>
+</div>

@@ -1,0 +1,347 @@
+---
+title: 'Application Architecture'
+description: 'Learn about TaskFlow Angular architecture, folder structure, standalone components, and modern Angular patterns'
+---
+
+## Overview
+
+TaskFlow Angular is built using Angular 21 with a modern, component-based architecture that leverages standalone components, signals for reactive state management, and functional APIs. The application follows a clear separation of concerns with a well-organized folder structure.
+
+## Folder Structure
+
+The application follows Angular best practices with a feature-based organization:
+
+```
+src/app/
+├── components/          # Reusable UI components
+│   ├── column/         # Column-related components
+│   ├── layout/         # Layout components (header, sidebar, layout)
+│   ├── task/           # Task-related components
+│   └── ui/             # Generic UI components (modals, etc.)
+├── guards/             # Route guards
+├── interceptors/       # HTTP interceptors
+├── models/             # TypeScript interfaces and types
+├── pages/              # Page-level components
+│   ├── auth/          # Authentication pages (login, register)
+│   └── boards/        # Board-related pages
+├── services/           # Business logic and HTTP services
+├── app.config.ts      # Application configuration
+├── app.routes.ts      # Route definitions
+└── app.ts             # Root component
+```
+
+<Note>
+Each component has its own folder containing the TypeScript file, HTML template, CSS styles, and spec file for tests.
+</Note>
+
+## Standalone Components
+
+TaskFlow Angular uses standalone components exclusively, eliminating the need for NgModules. This is a modern Angular pattern that provides better tree-shaking and simpler component composition.
+
+### Root Component
+
+The root component demonstrates the standalone pattern:
+
+```typescript title="app.ts"
+import { Component, signal } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+
+@Component({
+  selector: 'app-root',
+  imports: [RouterOutlet],
+  templateUrl: './app.html',
+  styleUrl: './app.css'
+})
+export class App {
+  protected readonly title = signal('TaskFlowAngular');
+}
+```
+
+Key features:
+- **No `standalone: true`** - In Angular 21, components are standalone by default
+- **Direct imports** - Components import only what they need via the `imports` array
+- **Signal-based state** - Uses signals for reactive properties
+
+### Component Organization
+
+Components are organized by feature and responsibility:
+
+#### Layout Components
+
+```typescript title="components/layout/layout/layout.ts"
+import { Component } from '@angular/core';
+import { Header } from "../header/header";
+import { RouterOutlet } from '@angular/router';
+import { Sidebar } from "../sidebar/sidebar";
+
+@Component({
+  selector: 'app-layout',
+  imports: [Header, RouterOutlet, Sidebar],
+  templateUrl: './layout.html',
+  styleUrl: './layout.css',
+})
+export class Layout {
+
+}
+```
+
+The Layout component composes other components (Header, Sidebar, RouterOutlet) to create the main application shell.
+
+#### Feature Components
+
+```typescript title="components/task/task-card/task-card.ts"
+import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { TaskItem } from '../../../services/board.service';
+import { CommonModule } from '@angular/common';
+
+@Component({
+  selector: 'app-task-card',
+  imports: [CommonModule],
+  templateUrl: './task-card.html',
+  styleUrl: './task-card.css',
+})
+export class TaskCard {
+  @Input() task!: TaskItem;
+  @Output() delete = new EventEmitter<number>();
+
+  onDelete(event: Event) {
+    event.stopPropagation();
+    this.delete.emit();
+  }
+}
+```
+
+<Info>
+Standalone components can be lazy-loaded without NgModules, improving the application's initial load time.
+</Info>
+
+## Application Bootstrap
+
+The application uses the modern `bootstrapApplication` API:
+
+```typescript title="main.ts"
+import { bootstrapApplication } from '@angular/platform-browser';
+import { appConfig } from './app/app.config';
+import { App } from './app/app';
+
+bootstrapApplication(App, appConfig)
+  .catch((err) => console.error(err));
+```
+
+### Application Configuration
+
+Centralized configuration in `app.config.ts`:
+
+```typescript title="app.config.ts"
+import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { authInterceptor } from './interceptors/auth-interceptor';
+import { routes } from './app.routes';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideBrowserGlobalErrorListeners(),
+    provideRouter(routes),
+    provideHttpClient(
+      withInterceptors([authInterceptor])
+    )
+  ]
+};
+```
+
+This configuration:
+- Provides the router with route definitions
+- Sets up HTTP client with functional interceptors
+- Enables global error listeners
+
+## Routing Architecture
+
+TaskFlow uses a hierarchical routing structure with lazy-loaded components:
+
+```typescript title="app.routes.ts"
+import { Routes } from '@angular/router';
+import { authGuard } from './guards/auth-guard';
+import { Layout } from './components/layout/layout/layout';
+
+export const routes: Routes = [
+  // Public routes
+  {
+    path: 'login',
+    loadComponent: () =>
+      import('./pages/auth/login-page/login-page')
+        .then(m => m.LoginPage)
+  },
+  {
+    path: 'register',
+    loadComponent: () =>
+      import('./pages/auth/register-page/register-page')
+        .then(m => m.RegisterPage)
+  },
+  // Protected routes
+  {
+    path: '',
+    component: Layout,
+    canActivate: [authGuard],
+    children: [
+      {
+        path: 'boards',
+        loadComponent: () =>
+          import('./pages/boards/board-list-page/board-list-page')
+            .then(m => m.BoardListPage)
+      },
+      {
+        path: 'boards/:id',
+        loadComponent: () =>
+          import('./pages/boards/board-detail-page/board-detail-page')
+            .then(m => m.BoardDetailPage)
+      },
+      {
+        path: '',
+        redirectTo: 'boards',
+        pathMatch: 'full'
+      }
+    ]
+  },
+  {
+    path: '**',
+    redirectTo: 'boards'
+  }
+];
+```
+
+Key routing features:
+- **Lazy loading** - All page components are lazy-loaded using dynamic imports
+- **Route guards** - Protected routes use `authGuard` for authentication
+- **Nested routes** - Protected routes are nested under the Layout component
+- **Functional guards** - Uses the modern functional guard API
+
+<Warning>
+All routes except `/login` and `/register` require authentication. Unauthenticated users are redirected to the login page.
+</Warning>
+
+## Service Architecture
+
+Services are provided at the root level using the `providedIn: 'root'` pattern, ensuring singleton instances across the application.
+
+### Service Pattern
+
+```typescript title="services/board.service.ts"
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class BoardService {
+  private http = inject(HttpClient);
+  private apiUrl = 'https://localhost:7057/api/board';
+
+  getMyBoards(): Observable<BoardSummary[]> {
+    return this.http.get<BoardSummary[]>(`${this.apiUrl}/my`);
+  }
+
+  getBoard(id: string): Observable<Board> {
+    return this.http.get<Board>(`${this.apiUrl}/${id}`);
+  }
+
+  createBoard(data: { name: string }) {
+    return this.http.post<BoardSummary>(
+      `${this.apiUrl}`,
+      data
+    );
+  }
+}
+```
+
+Services use:
+- **Dependency injection** - Uses `inject()` function instead of constructor injection
+- **Type safety** - All HTTP calls are typed with interfaces
+- **Observable pattern** - Returns RxJS observables for asynchronous operations
+
+## Signals for Reactive State
+
+Signals provide fine-grained reactivity without RxJS complexity:
+
+```typescript title="pages/boards/board-detail-page/board-detail-page.ts"
+import { Component, signal, inject, OnInit } from '@angular/core';
+
+export class BoardDetailPage implements OnInit {
+  board = signal<Board | null>(null);
+
+  ngOnInit() {
+    this.route.paramMap.subscribe(params => {
+      const id = params.get('id');
+      if (!id) return;
+
+      this.board.set(null);
+      this.boardService.getBoard(id).subscribe(board => {
+        this.board.set(board);
+      });
+    });
+  }
+
+  handleTaskCreated(event: { columnId: number; task: TaskItem }) {
+    this.board.update(b => {
+      if (!b) return b;
+      return {
+        ...b,
+        columns: b.columns.map(c =>
+          c.id === event.columnId
+            ? { ...c, tasks: [...c.tasks, event.task] }
+            : c
+        )
+      };
+    });
+  }
+}
+```
+
+<Info>
+See the [State Management](/core/state-management) guide for more details on using signals effectively.
+</Info>
+
+## Dependency Injection
+
+TaskFlow uses the modern `inject()` function for dependency injection:
+
+```typescript
+export class LoginPage {
+  private authService = inject(AuthService);
+  private router = inject(Router);
+
+  login() {
+    this.authService.login(this.email, this.password)
+      .subscribe({
+        next: () => this.router.navigate(['/boards']),
+        error: () => this.error = 'Credenciales incorrectas'
+      });
+  }
+}
+```
+
+Benefits:
+- Cleaner code without constructor parameters
+- Can be used outside of constructors
+- Better tree-shaking support
+
+## Key Architectural Principles
+
+1. **Component Isolation** - Each component is self-contained with its own template, styles, and logic
+2. **Unidirectional Data Flow** - Data flows down through inputs, events bubble up through outputs
+3. **Service Layer** - Business logic and HTTP operations are centralized in services
+4. **Type Safety** - TypeScript interfaces define all data structures
+5. **Lazy Loading** - Pages are loaded on-demand to optimize bundle size
+6. **Functional APIs** - Modern Angular patterns (standalone components, functional guards, inject function)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/core/authentication">
+    Learn about JWT authentication, guards, and interceptors
+  </Card>
+  <Card title="State Management" icon="database" href="/core/state-management">
+    Master signals and reactive state patterns
+  </Card>
+</CardGroup>

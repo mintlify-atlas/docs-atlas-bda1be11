@@ -1,0 +1,194 @@
+---
+title: 'Column Component'
+description: 'Kanban board column that manages tasks with drag-and-drop functionality'
+---
+
+## Overview
+
+The Column component represents a vertical column in the Kanban board. It displays a list of tasks, supports drag-and-drop reordering, and provides column management features like renaming and deletion.
+
+## Component Signature
+
+```typescript
+import { Column } from '@app/components/column/column/column';
+```
+
+## Inputs
+
+<ParamField path="column" type="TaskColumn" required>
+  The column data containing id, name, and tasks array
+  
+  ```typescript
+  interface TaskColumn {
+    id: number;
+    name: string;
+    tasks: TaskItem[];
+  }
+  ```
+</ParamField>
+
+<ParamField path="connectedTo" type="string[]" default="[]">
+  Array of column IDs for drag-and-drop connections. Enables tasks to be dragged between connected columns.
+</ParamField>
+
+## Outputs
+
+<ParamField path="taskCreated" type="EventEmitter<{columnId: number, task: TaskItem}>">
+  Emitted when a new task is created in the column
+</ParamField>
+
+<ParamField path="taskUpdated" type="EventEmitter<{columnId: number, task: TaskItem}>">
+  Emitted when a task is updated
+</ParamField>
+
+<ParamField path="taskDeleted" type="EventEmitter<{columnId: number, taskId: number}>">
+  Emitted when a task is deleted from the column
+</ParamField>
+
+<ParamField path="columnDeleted" type="EventEmitter<number>">
+  Emitted when the column itself is deleted, passes the column ID
+</ParamField>
+
+<ParamField path="columnUpdated" type="EventEmitter<{id: number, name: string}>">
+  Emitted when the column name is updated
+</ParamField>
+
+## TypeScript Interfaces
+
+```typescript
+interface TaskItem {
+  id: number;
+  title: string;
+  description: string;
+}
+
+interface TaskColumn {
+  id: number;
+  name: string;
+  tasks: TaskItem[];
+}
+```
+
+## Usage
+
+### Basic Example
+
+```html
+<app-column
+  [column]="column"
+  [connectedTo]="connectedColumnIds"
+  (taskCreated)="onTaskCreated($event)"
+  (taskUpdated)="onTaskUpdated($event)"
+  (taskDeleted)="onTaskDeleted($event)"
+  (columnDeleted)="onColumnDeleted($event)"
+  (columnUpdated)="onColumnUpdated($event)">
+</app-column>
+```
+
+### Component TypeScript
+
+```typescript
+import { Component } from '@angular/core';
+import { Column } from '@app/components/column/column/column';
+import { TaskColumn, TaskItem } from '@app/services/board.service';
+
+@Component({
+  selector: 'app-board',
+  imports: [Column],
+  template: `
+    @for (column of columns; track column.id) {
+      <app-column
+        [column]="column"
+        [connectedTo]="getConnectedIds(column.id)"
+        (taskCreated)="handleTaskCreated($event)"
+        (taskUpdated)="handleTaskUpdated($event)"
+        (taskDeleted)="handleTaskDeleted($event)"
+        (columnDeleted)="handleColumnDeleted($event)"
+        (columnUpdated)="handleColumnUpdated($event)">
+      </app-column>
+    }
+  `
+})
+export class BoardComponent {
+  columns: TaskColumn[] = [
+    { id: 1, name: 'To Do', tasks: [] },
+    { id: 2, name: 'In Progress', tasks: [] },
+    { id: 3, name: 'Done', tasks: [] }
+  ];
+
+  getConnectedIds(currentId: number): string[] {
+    return this.columns
+      .filter(col => col.id !== currentId)
+      .map(col => col.id.toString());
+  }
+
+  handleTaskCreated(event: { columnId: number; task: TaskItem }) {
+    const column = this.columns.find(col => col.id === event.columnId);
+    if (column) {
+      column.tasks.push(event.task);
+    }
+  }
+
+  handleTaskUpdated(event: { columnId: number; task: TaskItem }) {
+    const column = this.columns.find(col => col.id === event.columnId);
+    if (column) {
+      const index = column.tasks.findIndex(t => t.id === event.task.id);
+      if (index !== -1) {
+        column.tasks[index] = event.task;
+      }
+    }
+  }
+
+  handleTaskDeleted(event: { columnId: number; taskId: number }) {
+    const column = this.columns.find(col => col.id === event.columnId);
+    if (column) {
+      column.tasks = column.tasks.filter(t => t.id !== event.taskId);
+    }
+  }
+
+  handleColumnDeleted(columnId: number) {
+    this.columns = this.columns.filter(col => col.id !== columnId);
+  }
+
+  handleColumnUpdated(event: { id: number; name: string }) {
+    const column = this.columns.find(col => col.id === event.id);
+    if (column) {
+      column.name = event.name;
+    }
+  }
+}
+```
+
+## Features
+
+### Drag and Drop
+
+The column uses Angular CDK's drag-and-drop functionality to enable:
+- Reordering tasks within the same column
+- Moving tasks between connected columns
+- Automatic position updates via TaskService
+
+### Column Management
+
+- **Rename**: Click the edit button to rename the column inline
+- **Delete**: Click the delete button to remove the column (with confirmation modal)
+
+### Task Management
+
+- **Create**: Click "+ Nueva tarea" button to open the task modal
+- **Edit**: Click on any task card to edit its details
+- **Delete**: Click the delete button on task cards
+
+## Dependencies
+
+The Column component requires:
+- `TaskService` for task CRUD operations
+- `ColumnService` for column updates/deletion
+- `@angular/cdk/drag-drop` for drag-and-drop functionality
+- `TaskCard` component for rendering individual tasks
+- `TaskModal` component for creating/editing tasks
+- `ConfirmModal` component for delete confirmations
+
+## Source Code Reference
+
+Component implementation: `src/app/components/column/column/column.ts:18`

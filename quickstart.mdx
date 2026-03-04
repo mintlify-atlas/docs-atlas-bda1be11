@@ -1,80 +1,166 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get TaskFlow Angular up and running in minutes
 ---
 
-## Get started in three steps
+This guide will help you set up and run TaskFlow Angular, a Kanban-style project management application built with Angular 21.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, ensure you have the following installed:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- **Node.js** 18.19 or later
+- **npm** 11.6.1 or later (automatically installed with Node.js)
+- **Backend API** running on `https://localhost:7057` (ASP.NET Core with MySQL)
 
-### Step 2: Deploy your changes
+<Note>
+TaskFlow Angular requires a backend API to function. Ensure the backend is configured and running before starting the frontend application.
+</Note>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+<Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Step title="Clone and navigate to the project">
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+Clone the repository and navigate to the project directory:
 
-### Step 3: Go live
+```bash
+git clone <repository-url>
+cd task-flow-angular
+```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+</Step>
+
+<Step title="Install dependencies">
+
+Install all required packages using npm:
+
+```bash
+npm install
+```
+
+This will install:
+- Angular 21.1.0 core packages
+- Angular CDK 21.1.5 for drag-and-drop functionality
+- RxJS 7.8.0 for reactive programming
+- Development tools including TypeScript 5.9.2 and Vitest 4.0.8
+
+</Step>
+
+<Step title="Start the development server">
+
+Run the application in development mode:
+
+```bash
+npm start
+```
+
+Or use the Angular CLI directly:
+
+```bash
+ng serve
+```
+
+The application will be available at `http://localhost:4200`
+
+</Step>
+
+<Step title="Access the application">
+
+Open your browser and navigate to:
+
+```
+http://localhost:4200
+```
+
+You'll be redirected to the login page. Create a new account using the register link or log in with existing credentials.
+
+</Step>
+
+</Steps>
+
+## Available scripts
+
+TaskFlow Angular includes several npm scripts for different tasks:
+
+<CodeGroup>
+
+```bash Development
+npm start
+# Starts the development server with hot reload
+```
+
+```bash Build
+npm run build
+# Creates an optimized production build
+```
+
+```bash Watch Mode
+npm run watch
+# Builds the project and watches for changes
+```
+
+```bash Tests
+npm test
+# Runs the test suite using Vitest
+```
+
+</CodeGroup>
+
+## Project structure
+
+Once the application is running, you'll find the following structure:
+
+```
+src/app/
+├── components/          # Reusable UI components
+│   ├── layout/         # Header, sidebar, and layout components
+│   ├── column/         # Kanban column components
+│   ├── task/           # Task card and modal components
+│   └── ui/             # Generic UI components (modals, etc.)
+├── pages/              # Route-based page components
+│   ├── auth/           # Login and register pages
+│   └── boards/         # Board list and detail pages
+├── services/           # Business logic and API communication
+├── guards/             # Route protection (authGuard)
+├── interceptors/       # HTTP interceptors (JWT authentication)
+└── models/             # TypeScript interfaces and types
+```
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+Now that you have TaskFlow Angular running, you can:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Explore features" icon="compass" href="/guides/boards">
+    Create boards, add columns, and manage tasks with drag-and-drop
+  </Card>
+  <Card title="Configure the app" icon="gear" href="/core/architecture">
+    Customize the API endpoint and application settings
+  </Card>
+  <Card title="Development guide" icon="code" href="/core/architecture">
+    Learn about the architecture and best practices
+  </Card>
+  <Card title="Authentication" icon="lock" href="/core/authentication">
+    Understand JWT authentication and guards
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Application won't start">
+    Ensure you have the correct Node.js version installed (18.19 or later). Check that all dependencies installed successfully by running `npm install` again.
+  </Accordion>
+  
+  <Accordion title="Cannot connect to backend API">
+    Verify the backend API is running on `https://localhost:7057`. Check the `apiUrl` configuration in your service files (e.g., `src/app/services/auth.service.ts:11`).
+  </Accordion>
+  
+  <Accordion title="Port 4200 is already in use">
+    Kill the process using port 4200 or specify a different port: `ng serve --port 4300`
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+The default API URL is configured as `https://localhost:7057`. Make sure to update this in your service files if your backend runs on a different URL.
+</Warning>

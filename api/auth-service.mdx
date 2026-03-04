@@ -1,0 +1,286 @@
+---
+title: 'AuthService'
+description: 'Authentication service for managing user login, registration, and session tokens'
+---
+
+## Overview
+
+The `AuthService` handles all authentication-related operations including user login, registration, token management, and session state. It integrates with the backend API and manages local storage for persisting authentication tokens.
+
+## Import
+
+```typescript
+import { AuthService } from './services/auth.service';
+```
+
+## Methods
+
+### login()
+
+Authenticates a user with email and password credentials.
+
+<ParamField path="email" type="string" required>
+  The user's email address
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  The user's password
+</ParamField>
+
+<ResponseField name="token" type="string">
+  JWT authentication token stored in localStorage
+</ResponseField>
+
+**Returns:** `Observable<{ token: string }>`
+
+**Implementation:**
+```typescript
+login(email: string, password: string) {
+  return this.http.post<{ token: string }>(
+    `${this.apiUrl}/login`,
+    { email, password }
+  ).pipe(
+    tap(response => {
+      localStorage.setItem('token', response.token);
+    })
+  );
+}
+```
+
+**Usage Example:**
+```typescript
+const authService = inject(AuthService);
+
+authService.login('user@example.com', 'password123')
+  .subscribe({
+    next: (response) => {
+      console.log('Login successful', response.token);
+      // Token is automatically stored in localStorage
+    },
+    error: (error) => {
+      console.error('Login failed', error);
+    }
+  });
+```
+
+---
+
+### register()
+
+Registers a new user account.
+
+<ParamField path="data" type="object" required>
+  Registration data containing user information
+  
+  <ParamField path="data.username" type="string" required>
+    The desired username
+  </ParamField>
+  
+  <ParamField path="data.email" type="string" required>
+    The user's email address
+  </ParamField>
+  
+  <ParamField path="data.password" type="string" required>
+    The user's password
+  </ParamField>
+</ParamField>
+
+**Returns:** `Observable<any>`
+
+**Implementation:**
+```typescript
+register(data: { username: string; email: string; password: string }) {
+  return this.http.post(`${this.apiUrl}/register`, data);
+}
+```
+
+**Usage Example:**
+```typescript
+const authService = inject(AuthService);
+
+authService.register({
+  username: 'johndoe',
+  email: 'john@example.com',
+  password: 'securePassword123'
+}).subscribe({
+  next: () => {
+    console.log('Registration successful');
+  },
+  error: (error) => {
+    console.error('Registration failed', error);
+  }
+});
+```
+
+---
+
+### logout()
+
+Logs out the current user by removing the authentication token from local storage.
+
+**Returns:** `void`
+
+**Implementation:**
+```typescript
+logout() {
+  localStorage.removeItem('token');
+}
+```
+
+**Usage Example:**
+```typescript
+const authService = inject(AuthService);
+
+authService.logout();
+console.log('User logged out');
+```
+
+---
+
+### getToken()
+
+Retrieves the current authentication token from local storage.
+
+**Returns:** `string | null` - The JWT token if authenticated, otherwise `null`
+
+**Implementation:**
+```typescript
+getToken(): string | null {
+  return localStorage.getItem('token');
+}
+```
+
+**Usage Example:**
+```typescript
+const authService = inject(AuthService);
+
+const token = authService.getToken();
+if (token) {
+  console.log('Token found:', token);
+} else {
+  console.log('No token available');
+}
+```
+
+---
+
+### isLoggedIn()
+
+Checks if a user is currently authenticated.
+
+**Returns:** `boolean` - `true` if a token exists in localStorage, `false` otherwise
+
+**Implementation:**
+```typescript
+isLoggedIn(): boolean {
+  return !!localStorage.getItem('token');
+}
+```
+
+**Usage Example:**
+```typescript
+const authService = inject(AuthService);
+
+if (authService.isLoggedIn()) {
+  console.log('User is authenticated');
+} else {
+  console.log('User is not authenticated');
+}
+```
+
+---
+
+### moveTask()
+
+<Note>
+  This method appears to be misplaced in AuthService and should likely be in TaskService.
+</Note>
+
+Moves a task to a new column and position.
+
+<ParamField path="id" type="number" required>
+  The task ID to move
+</ParamField>
+
+<ParamField path="data" type="object" required>
+  Movement data
+  
+  <ParamField path="data.newColumnId" type="number" required>
+    The target column ID
+  </ParamField>
+  
+  <ParamField path="data.newPosition" type="number" required>
+    The new position in the column
+  </ParamField>
+</ParamField>
+
+**Returns:** `Observable<any>`
+
+**Implementation:**
+```typescript
+moveTask(id: number, data: { newColumnId: number; newPosition: number }) {
+  return this.http.put(`${this.apiUrl}/${id}/move`, data);
+}
+```
+
+## Configuration
+
+**API Endpoint:** `https://localhost:7057/api/Auth`
+
+**Provider:** Registered in root module (`providedIn: 'root'`)
+
+## Dependencies
+
+- `HttpClient` - For making HTTP requests to the backend API
+- `rxjs/operators` - Uses `tap` operator for side effects
+
+## Complete Example
+
+```typescript
+import { Component, inject } from '@angular/core';
+import { AuthService } from './services/auth.service';
+
+@Component({
+  selector: 'app-login',
+  template: `
+    <div *ngIf="!isAuthenticated()">
+      <button (click)="login()">Login</button>
+      <button (click)="register()">Register</button>
+    </div>
+    <div *ngIf="isAuthenticated()">
+      <p>Welcome! You are logged in.</p>
+      <button (click)="logout()">Logout</button>
+    </div>
+  `
+})
+export class LoginComponent {
+  private authService = inject(AuthService);
+
+  login() {
+    this.authService.login('user@example.com', 'password')
+      .subscribe({
+        next: () => console.log('Logged in successfully'),
+        error: (err) => console.error('Login error:', err)
+      });
+  }
+
+  register() {
+    this.authService.register({
+      username: 'newuser',
+      email: 'newuser@example.com',
+      password: 'password123'
+    }).subscribe({
+      next: () => console.log('Registered successfully'),
+      error: (err) => console.error('Registration error:', err)
+    });
+  }
+
+  logout() {
+    this.authService.logout();
+  }
+
+  isAuthenticated(): boolean {
+    return this.authService.isLoggedIn();
+  }
+}
+```

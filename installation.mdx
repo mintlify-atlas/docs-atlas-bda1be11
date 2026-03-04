@@ -1,0 +1,418 @@
+---
+title: Installation
+description: Complete installation guide for TaskFlow Angular with all prerequisites and setup steps
+---
+
+This guide provides detailed instructions for installing and configuring TaskFlow Angular, a modern Kanban application built with Angular 21 standalone components and signals.
+
+## System requirements
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    Version 18.19 or later
+  </Card>
+  <Card title="npm" icon="npm">
+    Version 11.6.1 or later
+  </Card>
+  <Card title="Operating System" icon="desktop">
+    Windows, macOS, or Linux
+  </Card>
+  <Card title="Backend API" icon="server">
+    ASP.NET Core (.NET 9) with MySQL
+  </Card>
+</CardGroup>
+
+## Prerequisites
+
+### Install Node.js and npm
+
+<Steps>
+
+<Step title="Download Node.js">
+
+Download and install Node.js from the official website:
+
+```bash
+https://nodejs.org/
+```
+
+This will automatically install npm as well.
+
+</Step>
+
+<Step title="Verify installation">
+
+Confirm that Node.js and npm are installed correctly:
+
+```bash
+node --version
+# Should output: v18.19.0 or later
+
+npm --version
+# Should output: 11.6.1 or later
+```
+
+</Step>
+
+</Steps>
+
+### Install Angular CLI (optional)
+
+While not required (the project includes Angular CLI as a dev dependency), you can install it globally for convenience:
+
+```bash
+npm install -g @angular/cli@21.1.4
+```
+
+Verify the installation:
+
+```bash
+ng version
+```
+
+<Note>
+The project uses Angular CLI 21.1.4. If you have a different global version, the local version will take precedence when running commands within the project.
+</Note>
+
+## Installation steps
+
+<Steps>
+
+<Step title="Clone the repository">
+
+Clone the TaskFlow Angular repository:
+
+```bash
+git clone <repository-url>
+cd task-flow-angular
+```
+
+</Step>
+
+<Step title="Install dependencies">
+
+Install all project dependencies defined in `package.json`:
+
+```bash
+npm install
+```
+
+This will install the following key packages:
+
+**Core Dependencies:**
+- `@angular/core@21.1.0` - Angular framework core
+- `@angular/common@21.1.0` - Common Angular utilities
+- `@angular/forms@21.1.0` - Form handling
+- `@angular/router@21.1.0` - Client-side routing
+- `@angular/cdk@21.1.5` - Component Dev Kit (for drag-and-drop)
+- `rxjs@7.8.0` - Reactive programming library
+
+**Development Dependencies:**
+- `@angular/cli@21.1.4` - Angular command-line interface
+- `typescript@5.9.2` - TypeScript compiler
+- `vitest@4.0.8` - Unit testing framework
+
+</Step>
+
+<Step title="Configure the backend API URL">
+
+Update the API endpoint in your service files to match your backend URL. By default, services are configured to use `https://localhost:7057`.
+
+For example, in `src/app/services/auth.service.ts`:
+
+```typescript src/app/services/auth.service.ts
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthService {
+  private http = inject(HttpClient);
+  private apiUrl = 'https://localhost:7057/api/Auth'; // Update this URL
+
+  // ... service methods
+}
+```
+
+<Warning>
+Ensure you update the API URL in all service files if your backend runs on a different address.
+</Warning>
+
+</Step>
+
+<Step title="Verify the installation">
+
+Check that the project compiles without errors:
+
+```bash
+npm run build
+```
+
+This creates an optimized production build in the `dist/` directory.
+
+</Step>
+
+</Steps>
+
+## Project configuration
+
+### Angular configuration
+
+The project uses Angular's modern application builder. Key configuration is in `angular.json`:
+
+```json angular.json
+{
+  "projects": {
+    "TaskFlowAngular": {
+      "projectType": "application",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "src/main.ts",
+            "tsConfig": "tsconfig.app.json",
+            "styles": ["src/styles.css"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### TypeScript configuration
+
+The project uses strict TypeScript settings for better type safety:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "target": "ES2022",
+    "module": "preserve",
+    "experimentalDecorators": true
+  }
+}
+```
+
+### Application bootstrap
+
+TaskFlow Angular uses standalone components with a modern bootstrap approach:
+
+```typescript src/main.ts
+import { bootstrapApplication } from '@angular/platform-browser';
+import { appConfig } from './app/app.config';
+import { App } from './app/app';
+
+bootstrapApplication(App, appConfig)
+  .catch((err) => console.error(err));
+```
+
+The application configuration includes routing and HTTP client setup:
+
+```typescript src/app/app.config.ts
+import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { authInterceptor } from './interceptors/auth-interceptor';
+import { routes } from './app.routes';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideBrowserGlobalErrorListeners(),
+    provideRouter(routes),
+    provideHttpClient(
+      withInterceptors([authInterceptor])
+    )
+  ]
+};
+```
+
+## Understanding the architecture
+
+### Standalone components
+
+TaskFlow Angular uses Angular's standalone component architecture, eliminating the need for NgModules. Components import their dependencies directly:
+
+```typescript Example: Task Card Component
+import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { CommonModule } from '@angular/common';
+
+@Component({
+  selector: 'app-task-card',
+  imports: [CommonModule],
+  templateUrl: './task-card.html',
+  styleUrl: './task-card.css',
+})
+export class TaskCard {
+  @Input() task!: TaskItem;
+  @Output() delete = new EventEmitter<number>();
+}
+```
+
+### Routing configuration
+
+The application uses lazy-loaded routes with authentication guards:
+
+```typescript src/app/app.routes.ts
+import { Routes } from '@angular/router';
+import { authGuard } from './guards/auth-guard';
+import { Layout } from './components/layout/layout/layout';
+
+export const routes: Routes = [
+  {
+    path: 'login',
+    loadComponent: () =>
+      import('./pages/auth/login-page/login-page')
+        .then(m => m.LoginPage)
+  },
+  {
+    path: '',
+    component: Layout,
+    canActivate: [authGuard],
+    children: [
+      {
+        path: 'boards',
+        loadComponent: () =>
+          import('./pages/boards/board-list-page/board-list-page')
+            .then(m => m.BoardListPage)
+      }
+    ]
+  }
+];
+```
+
+<Note>
+All protected routes use the `authGuard` to ensure users are authenticated before accessing board functionality.
+</Note>
+
+## Development tools
+
+### Package manager
+
+The project specifies npm 11.6.1 as the package manager:
+
+```json package.json
+{
+  "packageManager": "npm@11.6.1"
+}
+```
+
+### Code formatting
+
+Prettier is configured with custom settings:
+
+```json package.json
+{
+  "prettier": {
+    "printWidth": 100,
+    "singleQuote": true,
+    "overrides": [
+      {
+        "files": "*.html",
+        "options": {
+          "parser": "angular"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Backend setup
+
+<Warning>
+TaskFlow Angular requires a backend API to function. You must set up the ASP.NET Core backend before using the application.
+</Warning>
+
+The backend setup involves:
+
+<Steps>
+
+<Step title="Configure MySQL connection">
+
+Set up your MySQL database and configure the connection string in the backend project.
+
+</Step>
+
+<Step title="Run database migrations">
+
+Apply Entity Framework migrations:
+
+```bash
+dotnet ef database update
+```
+
+</Step>
+
+<Step title="Start the API server">
+
+Run the ASP.NET Core API:
+
+```bash
+dotnet run
+```
+
+The API should be accessible at `https://localhost:7057`.
+
+</Step>
+
+</Steps>
+
+## Next steps
+
+With the installation complete, you're ready to:
+
+<CardGroup cols={2}>
+  <Card title="Start development" icon="play" href="/quickstart">
+    Run the application and start building
+  </Card>
+  <Card title="Explore features" icon="compass" href="/guides/boards">
+    Learn about boards, columns, and tasks
+  </Card>
+  <Card title="Authentication" icon="lock" href="/core/authentication">
+    Understand JWT authentication and guards
+  </Card>
+  <Card title="Drag and drop" icon="hand" href="/guides/drag-and-drop">
+    Implement Angular CDK drag-and-drop
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Dependency installation fails">
+    Try clearing the npm cache and reinstalling:
+    
+    ```bash
+    npm cache clean --force
+    rm -rf node_modules package-lock.json
+    npm install
+    ```
+  </Accordion>
+  
+  <Accordion title="TypeScript errors during build">
+    Ensure you're using TypeScript 5.9.2 or compatible version. Check your `tsconfig.json` settings match the project requirements.
+  </Accordion>
+  
+  <Accordion title="Angular CDK not working">
+    Verify that `@angular/cdk@21.1.5` is installed correctly. The drag-and-drop functionality requires this package:
+    
+    ```bash
+    npm list @angular/cdk
+    ```
+  </Accordion>
+  
+  <Accordion title="Backend connection issues">
+    Check that:
+    - The backend API is running
+    - CORS is configured to allow requests from `http://localhost:4200`
+    - The API URL in service files matches your backend address
+    - SSL certificates are valid (or disable SSL validation for development)
+  </Accordion>
+</AccordionGroup>

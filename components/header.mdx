@@ -1,0 +1,149 @@
+---
+title: 'Header Component'
+description: 'Top navigation bar displaying the application branding'
+icon: 'window-frame-open'
+---
+
+## Overview
+
+The `Header` component provides a simple top navigation bar that displays the TaskFlow branding. It serves as a consistent header across all application pages.
+
+## Component Signature
+
+```typescript header.ts
+import { Component, inject } from '@angular/core';
+
+@Component({
+  selector: 'app-header',
+  imports: [ ],
+  templateUrl: './header.html',
+  styleUrl: './header.css'
+})
+export class Header {
+
+}
+```
+
+## Template Structure
+
+```html header.html
+<header class="header">
+  <div class="logo">
+    TaskFlow
+  </div>
+</header>
+```
+
+## Usage
+
+The Header component is used within the Layout component:
+
+```typescript
+import { Header } from './components/layout/header/header';
+
+@Component({
+  selector: 'app-layout',
+  imports: [Header],
+  template: `
+    <div class="app-layout">
+      <app-header></app-header>
+      <!-- Other layout content -->
+    </div>
+  `
+})
+export class Layout { }
+```
+
+## Customization
+
+Currently, the Header component displays a static logo. You can extend it to include additional features:
+
+### Adding User Profile
+
+```typescript header.ts
+import { Component, inject } from '@angular/core';
+import { AuthService } from '../../../services/auth.service';
+
+@Component({
+  selector: 'app-header',
+  imports: [ ],
+  templateUrl: './header.html',
+  styleUrl: './header.css'
+})
+export class Header {
+  private authService = inject(AuthService);
+  
+  currentUser$ = this.authService.currentUser$;
+}
+```
+
+```html header.html
+<header class="header">
+  <div class="logo">
+    TaskFlow
+  </div>
+  
+  @if (currentUser$ | async; as user) {
+    <div class="user-profile">
+      {{ user.name }}
+    </div>
+  }
+</header>
+```
+
+### Adding Navigation Links
+
+```html header.html
+<header class="header">
+  <div class="logo">
+    TaskFlow
+  </div>
+  
+  <nav class="header-nav">
+    <a routerLink="/boards" routerLinkActive="active">Boards</a>
+    <a routerLink="/settings" routerLinkActive="active">Settings</a>
+  </nav>
+</header>
+```
+
+<Info>
+  Remember to add the required imports (RouterLink, RouterLinkActive, CommonModule) when extending the component with new features.
+</Info>
+
+## Styling
+
+The Header component includes custom CSS for styling:
+
+- `.header`: Main header container, typically positioned fixed or sticky
+- `.logo`: Logo/branding container
+
+<Tip>
+  The header typically uses fixed positioning to remain visible during scrolling. Ensure proper z-index management to layer correctly with other components.
+</Tip>
+
+## Related Components
+
+<CardGroup cols={2}>
+  <Card title="Layout" icon="grid" href="./layout">
+    Main application layout wrapper
+  </Card>
+  <Card title="Sidebar" icon="sidebar" href="./sidebar">
+    Navigation sidebar component
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep header minimal">
+    The header should contain only essential navigation and branding elements. Avoid cluttering it with too many controls or information.
+  </Accordion>
+  
+  <Accordion title="Consider responsive design">
+    On mobile devices, consider hiding or collapsing header elements, or integrating them into a hamburger menu.
+  </Accordion>
+  
+  <Accordion title="Maintain consistent branding">
+    The header should maintain consistent branding across all pages. Use design tokens or CSS variables for colors and spacing.
+  </Accordion>
+</AccordionGroup>

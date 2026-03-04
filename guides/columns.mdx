@@ -1,0 +1,603 @@
+---
+title: Managing Columns
+description: Learn how to create, edit, delete, and reorder columns in TaskFlow boards
+---
+
+Columns represent different stages or categories in your workflow. They help you organize tasks and visualize your progress using a Kanban-style board layout.
+
+## Understanding Columns
+
+A column in TaskFlow represents a stage in your workflow (e.g., "To Do", "In Progress", "Done"). Each column:
+
+- Belongs to a specific board
+- Has a name and position
+- Contains multiple tasks
+- Can be reordered within the board
+
+### Column Data Structure
+
+```typescript
+export interface Column {
+  id: number;
+  name: string;
+  position: number;
+  boardId: number;
+}
+
+export interface TaskColumn {
+  id: number;
+  name: string;
+  tasks: TaskItem[];
+}
+```
+
+## Creating a Column
+
+<Steps>
+  <Step title="Set Up the Column Service">
+    Inject the `ColumnService` into your board detail component:
+
+    ```typescript
+    import { ColumnService } from '../../../services/column.service';
+
+    export class BoardDetailPage {
+      private columnService = inject(ColumnService);
+      private cdr = inject(ChangeDetectorRef);
+      
+      board = signal<Board | null>(null);
+      showColumnForm = false;
+      newColumnName = '';
+      errorMessage = '';
+    }
+    ```
+  </Step>
+
+  <Step title="Toggle Column Form">
+    Create methods to show and hide the column creation form:
+
+    ```typescript
+    toggleColumnForm() {
+      this.showColumnForm = !this.showColumnForm;
+      this.newColumnName = '';
+      this.errorMessage = '';
+    }
+    ```
+  </Step>
+
+  <Step title="Create the Column">
+    Call the `createColumn` API method:
+
+    ```typescript
+    createColumn() {
+      if (!this.newColumnName.trim()) return;
+      if (!this.board()) return;
+
+      this.columnService.createColumn({
+        boardId: this.board()!.id,
+        name: this.newColumnName
+      }).subscribe({
+        next: column => {
+          // Update the board state with the new column
+          this.board.update(b => {
+            if (!b) return b;
+            return {
+              ...b,
+              columns: [
+                ...b.columns,
+                { ...column, tasks: [] }
+              ]
+            };
+          });
+
+          this.newColumnName = '';
+          this.showColumnForm = false;
+          this.errorMessage = '';
+          this.cdr.detectChanges();
+        },
+        error: err => {
+          if (err.status === 403) {
+            this.errorMessage = 'You do not have permission to create columns.';
+          } else {
+            this.errorMessage = 'Error creating column.';
+          }
+          this.cdr.detectChanges();
+        }
+      });
+    }
+    ```
+  </Step>
+
+  <Step title="Add Column Form Template">
+    Create the column form in your template:
+
+    ```html
+    <div class="add-column">
+      <button (click)="toggleColumnForm()">+ New Column</button>
+
+      @if (showColumnForm) {
+        <div class="modal-overlay" (click)="toggleColumnForm()">
+          <div class="column-modal" (click)="$event.stopPropagation()">
+            <h3>New Column</h3>
+
+            <input
+              type="text"
+              placeholder="Column name..."
+              [(ngModel)]="newColumnName"
+              (keydown.enter)="createColumn()"
+              autofocus
+            />
+
+            <div class="modal-actions">
+              <button (click)="createColumn()">Create</button>
+              <button (click)="toggleColumnForm()">Cancel</button>
+            </div>
+
+            @if (errorMessage) {
+              <div class="modal-error">{{ errorMessage }}</div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+    ```
+  </Step>
+</Steps>
+
+## Displaying Columns
+
+Render all columns in your board using Angular's `@for` directive:
+
+```html
+<div class="columns-container">
+  @for (column of board()?.columns; track column.id) {
+    <app-column
+      [column]="column"
+      [connectedTo]="getConnectedColumns()"
+      (taskCreated)="handleTaskCreated($event)"
+      (taskUpdated)="handleTaskUpdated($event)"
+      (taskDeleted)="handleTaskDeleted($event)"
+      (columnDeleted)="handleColumnDelete($event)"
+      (columnUpdated)="handleColumnUpdate($event)">
+    </app-column>
+  }
+</div>
+```
+
+### Column Component
+
+The column component manages its own tasks and emits events to the parent:
+
+```typescript
+import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { TaskColumn, TaskItem } from '../../../services/board.service';
+
+@Component({
+  selector: 'app-column',
+  templateUrl: './column.html',
+  styleUrl: './column.css',
+})
+export class Column {
+  @Input() column!: TaskColumn;
+  @Input() connectedTo: string[] = []; // For drag-and-drop
+
+  @Output() taskCreated = new EventEmitter<{
+    columnId: number;
+    task: TaskItem;
+  }>();
+  
+  @Output() taskUpdated = new EventEmitter<{
+    columnId: number;
+    task: TaskItem;
+  }>();
+  
+  @Output() taskDeleted = new EventEmitter<{
+    columnId: number;
+    taskId: number;
+  }>();
+  
+  @Output() columnDeleted = new EventEmitter<number>();
+  @Output() columnUpdated = new EventEmitter<{
+    id: number;
+    name: string;
+  }>();
+
+  private columnService = inject(ColumnService);
+}
+```
+
+## Editing a Column
+
+<Note>
+  Column editing is typically restricted to board owners or members with appropriate permissions.
+</Note>
+
+<Steps>
+  <Step title="Add Editing State">
+    ```typescript
+    export class Column {
+      editing = false;
+      editName = '';
+
+      startEdit() {
+        this.editing = true;
+        this.editName = this.column.name;
+      }
+
+      cancelEdit() {
+        this.editing = false;
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Save Column Name">
+    ```typescript
+    saveEdit() {
+      if (!this.editName.trim()) return;
+
+      this.columnService.updateColumn(this.column.id, this.editName)
+        .subscribe(updated => {
+          this.columnUpdated.emit({
+            id: updated.id,
+            name: updated.name
+          });
+
+          this.editing = false;
+        });
+    }
+    ```
+  </Step>
+
+  <Step title="Handle Column Update in Parent">
+    Update the board state when a column is edited:
+
+    ```typescript
+    // In BoardDetailPage component
+    handleColumnUpdate(event: { id: number; name: string }) {
+      this.board.update(b => {
+        if (!b) return b;
+
+        return {
+          ...b,
+          columns: b.columns.map(c =>
+            c.id === event.id ? { ...c, name: event.name } : c
+          )
+        };
+      });
+    }
+    ```
+  </Step>
+
+  <Step title="Add Edit Template">
+    ```html
+    <div class="column-header">
+      @if (!editing) {
+        <h3 class="column-title">{{ column.name }}</h3>
+      }
+
+      @if (editing) {
+        <input
+          type="text"
+          [(ngModel)]="editName"
+          class="column-edit-input"
+        />
+      }
+
+      <div class="column-actions">
+        @if (!editing) {
+          <button (click)="startEdit()">Edit</button>
+        }
+
+        @if (editing) {
+          <button (click)="saveEdit()">Save</button>
+          <button (click)="cancelEdit()">Cancel</button>
+        }
+      </div>
+    </div>
+    ```
+  </Step>
+</Steps>
+
+## Deleting a Column
+
+<Warning>
+  Deleting a column will also delete all tasks within it. Always confirm before deletion.
+</Warning>
+
+<Steps>
+  <Step title="Show Confirmation Modal">
+    ```typescript
+    export class Column {
+      showConfirmModal = false;
+      errorMessage = '';
+
+      deleteColumn() {
+        this.showConfirmModal = true;
+      }
+
+      cancelDelete() {
+        this.showConfirmModal = false;
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Confirm and Delete">
+    ```typescript
+    confirmDeleteColumn() {
+      this.columnService.deleteColumn(this.column.id)
+        .subscribe({
+          next: () => {
+            this.columnDeleted.emit(this.column.id);
+            this.showConfirmModal = false;
+            this.errorMessage = '';
+          },
+          error: err => {
+            if (err.status === 403) {
+              this.errorMessage = 'No permission to delete this column.';
+            } else if (err.status === 404) {
+              this.errorMessage = 'Column not found.';
+            } else {
+              this.errorMessage = 'Error deleting column.';
+            }
+          }
+        });
+    }
+    ```
+  </Step>
+
+  <Step title="Handle Deletion in Parent">
+    ```typescript
+    // In BoardDetailPage component
+    handleColumnDelete(columnId: number) {
+      this.board.update(b => {
+        if (!b) return b;
+        
+        return {
+          ...b,
+          columns: b.columns.filter(c => c.id !== columnId)
+        };
+      });
+    }
+    ```
+  </Step>
+
+  <Step title="Add Confirmation Template">
+    ```html
+    @if (showConfirmModal) {
+      <app-confirm-modal
+        message="Delete this column and all its tasks?"
+        (confirm)="confirmDeleteColumn()"
+        (cancel)="cancelDelete()">
+      </app-confirm-modal>
+    }
+    ```
+  </Step>
+</Steps>
+
+## Reordering Columns
+
+Columns can be reordered by updating their position:
+
+```typescript
+export class ColumnService {
+  moveColumn(id: number, newPosition: number): Observable<Column> {
+    return this.http.put<Column>(`${this.apiUrl}/${id}/move`, {
+      newPosition
+    });
+  }
+}
+```
+
+### Usage Example
+
+```typescript
+moveColumn(columnId: number, newPosition: number) {
+  this.columnService.moveColumn(columnId, newPosition)
+    .subscribe(updatedColumn => {
+      // Refresh board or update local state
+      this.loadBoard();
+    });
+}
+```
+
+## Complete Column Service API
+
+<CodeGroup>
+```typescript column.service.ts
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+export interface Column {
+  id: number;
+  name: string;
+  position: number;
+  boardId: number;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class ColumnService {
+  private http = inject(HttpClient);
+  private apiUrl = 'https://localhost:7057/api/column';
+
+  // Create a new column
+  createColumn(data: { boardId: number; name: string }): Observable<Column> {
+    return this.http.post<Column>(this.apiUrl, data);
+  }
+
+  // Update column name
+  updateColumn(id: number, name: string): Observable<Column> {
+    return this.http.put<Column>(`${this.apiUrl}/${id}`, { name });
+  }
+
+  // Delete a column
+  deleteColumn(id: number) {
+    return this.http.delete(`${this.apiUrl}/${id}`);
+  }
+
+  // Move column to new position
+  moveColumn(id: number, newPosition: number): Observable<Column> {
+    return this.http.put<Column>(`${this.apiUrl}/${id}/move`, {
+      newPosition
+    });
+  }
+}
+```
+</CodeGroup>
+
+## Event Handling Pattern
+
+TaskFlow uses a parent-child event communication pattern:
+
+<Tabs>
+  <Tab title="Child Component (Column)">
+    The column component emits events:
+
+    ```typescript
+    @Output() columnUpdated = new EventEmitter<{
+      id: number;
+      name: string;
+    }>();
+
+    saveEdit() {
+      this.columnService.updateColumn(this.column.id, this.editName)
+        .subscribe(updated => {
+          this.columnUpdated.emit({
+            id: updated.id,
+            name: updated.name
+          });
+        });
+    }
+    ```
+  </Tab>
+
+  <Tab title="Parent Component (Board)">
+    The board component handles the events:
+
+    ```typescript
+    handleColumnUpdate(event: { id: number; name: string }) {
+      this.board.update(b => {
+        if (!b) return b;
+        return {
+          ...b,
+          columns: b.columns.map(c =>
+            c.id === event.id ? { ...c, name: event.name } : c
+          )
+        };
+      });
+    }
+    ```
+  </Tab>
+
+  <Tab title="Template Binding">
+    ```html
+    <app-column
+      [column]="column"
+      (columnUpdated)="handleColumnUpdate($event)"
+      (columnDeleted)="handleColumnDelete($event)">
+    </app-column>
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Immutable State Updates">
+    Always create new objects when updating board state:
+
+    ```typescript
+    // Good
+    this.board.update(b => ({
+      ...b,
+      columns: [...b.columns, newColumn]
+    }));
+
+    // Bad - mutates existing state
+    this.board().columns.push(newColumn);
+    ```
+  </Accordion>
+
+  <Accordion title="Handle Permission Errors">
+    Always check for 403 (Forbidden) errors when performing column operations:
+
+    ```typescript
+    .subscribe({
+      error: err => {
+        if (err.status === 403) {
+          this.errorMessage = 'Insufficient permissions';
+        }
+      }
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Use Change Detection">
+    Inject `ChangeDetectorRef` and trigger detection after async operations:
+
+    ```typescript
+    private cdr = inject(ChangeDetectorRef);
+
+    createColumn() {
+      this.columnService.createColumn(data).subscribe(() => {
+        // Update state
+        this.cdr.detectChanges();
+      });
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Provide User Feedback">
+    Always show error messages when operations fail:
+
+    ```html
+    @if (errorMessage) {
+      <div class="error-message">{{ errorMessage }}</div>
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Empty State
+
+Show a helpful message when a column has no tasks:
+
+```html
+<div class="tasks">
+  @for (task of column.tasks; track task.id) {
+    <app-task-card [task]="task"></app-task-card>
+  }
+
+  @if (column.tasks.length === 0) {
+    <p class="empty-state">No tasks yet</p>
+  }
+</div>
+```
+
+### Connected Columns for Drag-and-Drop
+
+Generate a list of connected column IDs for drag-and-drop functionality:
+
+```typescript
+getConnectedColumns(): string[] {
+  const b = this.board();
+  if (!b) return [];
+  return b.columns.map(c => c.id.toString());
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Managing Tasks" icon="list-check" href="/guides/tasks">
+    Learn how to create and manage tasks within columns
+  </Card>
+  <Card title="Drag and Drop" icon="hand" href="/guides/drag-and-drop">
+    Implement drag-and-drop functionality for tasks
+  </Card>
+</CardGroup>

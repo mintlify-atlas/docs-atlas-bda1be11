@@ -1,0 +1,498 @@
+---
+title: Managing Boards
+description: Learn how to create, edit, delete, and join boards in TaskFlow Angular
+---
+
+Boards are the foundation of TaskFlow's task management system. Each board contains columns and tasks, and can be shared with team members using join codes.
+
+## Understanding Boards
+
+A board in TaskFlow represents a project workspace where you can organize tasks into columns. Each board has:
+
+- **Name**: A descriptive title for your board
+- **Join Code**: A unique code that allows others to join your board
+- **Columns**: Customizable columns to organize your tasks
+- **Tasks**: Individual work items within columns
+
+### Board Data Structure
+
+```typescript
+export interface Board {
+  id: number;
+  name: string;
+  joinCode: string;
+  columns: TaskColumn[];
+}
+
+export interface BoardSummary {
+  id: number;
+  name: string;
+  joinCode: string;
+}
+```
+
+## Creating a New Board
+
+<Steps>
+  <Step title="Inject the Board Service">
+    First, inject the `BoardService` into your component:
+
+    ```typescript
+    import { BoardService } from '../../../services/board.service';
+
+    export class Sidebar implements OnInit {
+      private boardService = inject(BoardService);
+      newBoardName = '';
+    }
+    ```
+  </Step>
+
+  <Step title="Call the Create Board API">
+    Use the `createBoard` method to create a new board:
+
+    ```typescript
+    createBoard() {
+      const name = this.newBoardName.trim();
+      if (!name) return;
+
+      this.boardService.createBoard({ name })
+        .subscribe({
+          next: board => {
+            // Board created successfully
+            this.boards.update(list => [...list, board]);
+            this.newBoardName = '';
+            
+            // Navigate to the new board
+            this.router.navigate(['/boards', board.id]);
+          },
+          error: err => {
+            console.error('Error creating board:', err);
+          }
+        });
+    }
+    ```
+  </Step>
+
+  <Step title="Add the Template Form">
+    Create a form in your template to capture the board name:
+
+    ```html
+    <form (ngSubmit)="createBoard()">
+      <input
+        type="text"
+        placeholder="Board name..."
+        [(ngModel)]="newBoardName"
+        name="boardName"
+        required
+      />
+
+      <button 
+        type="submit"
+        [disabled]="!newBoardName.trim()">
+        Create Board
+      </button>
+    </form>
+    ```
+  </Step>
+</Steps>
+
+## Fetching Your Boards
+
+### Get All Your Boards
+
+Retrieve a list of all boards you have access to:
+
+```typescript
+import { BoardService, BoardSummary } from '../services/board.service';
+
+export class BoardListPage implements OnInit {
+  private boardService = inject(BoardService);
+  boards: BoardSummary[] = [];
+  isLoading = true;
+
+  ngOnInit(): void {
+    this.boardService.getMyBoards().subscribe({
+      next: data => {
+        this.boards = data;
+        this.isLoading = false;
+      },
+      error: err => {
+        console.error('Error fetching boards:', err);
+        this.isLoading = false;
+      }
+    });
+  }
+}
+```
+
+### Get a Single Board
+
+Retrieve detailed information about a specific board, including all columns and tasks:
+
+```typescript
+import { ActivatedRoute } from '@angular/router';
+import { Board } from '../services/board.service';
+
+export class BoardDetailPage implements OnInit {
+  private route = inject(ActivatedRoute);
+  private boardService = inject(BoardService);
+  board = signal<Board | null>(null);
+
+  ngOnInit() {
+    this.route.paramMap.subscribe(params => {
+      const id = params.get('id');
+      if (!id) return;
+
+      this.boardService.getBoard(id).subscribe(board => {
+        this.board.set(board);
+      });
+    });
+  }
+}
+```
+
+## Editing a Board
+
+<Note>
+  Only board owners have permission to edit board names.
+</Note>
+
+Update a board's name using the `updateBoard` method:
+
+```typescript
+export class BoardListPage {
+  private boardService = inject(BoardService);
+  editingBoardId: number | null = null;
+  editName = '';
+
+  startEdit(board: BoardSummary, event: Event) {
+    event.stopPropagation();
+    this.editingBoardId = board.id;
+    this.editName = board.name;
+  }
+
+  saveEdit(id: number, event: Event) {
+    event.stopPropagation();
+
+    const name = this.editName.trim();
+    if (!name) return;
+
+    this.boardService.updateBoard(id, name)
+      .subscribe(updated => {
+        // Update the local board list
+        this.boards = this.boards.map(b =>
+          b.id === id ? { ...b, name: updated.name } : b
+        );
+
+        this.cancelEdit();
+      });
+  }
+
+  cancelEdit() {
+    this.editingBoardId = null;
+    this.editName = '';
+  }
+}
+```
+
+### Template for Editing
+
+```html
+@for (board of boards; track board.id) {
+  <div class="board-card">
+    @if (editingBoardId !== board.id) {
+      <h3>{{ board.name }}</h3>
+      <button (click)="startEdit(board, $event)">Edit</button>
+    }
+
+    @if (editingBoardId === board.id) {
+      <input
+        type="text"
+        [(ngModel)]="editName"
+        (click)="$event.stopPropagation()"
+      />
+      <button (click)="saveEdit(board.id, $event)">Save</button>
+      <button (click)="cancelEdit()">Cancel</button>
+    }
+  </div>
+}
+```
+
+## Deleting a Board
+
+<Warning>
+  Deleting a board is permanent and will remove all columns and tasks within it.
+</Warning>
+
+<Steps>
+  <Step title="Show Confirmation Modal">
+    Before deleting, show a confirmation modal to prevent accidental deletions:
+
+    ```typescript
+    export class BoardListPage {
+      showConfirmModal = false;
+      boardToDelete: number | null = null;
+
+      deleteBoard(id: number, event: Event) {
+        event.stopPropagation();
+        this.boardToDelete = id;
+        this.showConfirmModal = true;
+      }
+
+      cancelDelete() {
+        this.showConfirmModal = false;
+        this.boardToDelete = null;
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Execute Deletion">
+    Once confirmed, call the `deleteBoard` method:
+
+    ```typescript
+    confirmDelete() {
+      if (!this.boardToDelete) return;
+
+      this.boardService.deleteBoard(this.boardToDelete)
+        .subscribe(() => {
+          // Remove from local list
+          this.boards = this.boards.filter(
+            b => b.id !== this.boardToDelete
+          );
+          
+          this.showConfirmModal = false;
+          this.boardToDelete = null;
+        });
+    }
+    ```
+  </Step>
+
+  <Step title="Add Confirmation Modal Template">
+    ```html
+    @if (showConfirmModal) {
+      <app-confirm-modal
+        message="Delete this board?"
+        (confirm)="confirmDelete()"
+        (cancel)="cancelDelete()">
+      </app-confirm-modal>
+    }
+    ```
+  </Step>
+</Steps>
+
+## Joining a Board
+
+Team members can join existing boards using a join code. Each board has a unique join code that's generated automatically.
+
+<Steps>
+  <Step title="Display Join Code">
+    The board owner can share the join code displayed in the board header:
+
+    ```html
+    @if (board()) {
+      <div class="board-header">
+        <h1>{{ board()!.name }}</h1>
+        <span>Join Code: {{ board()!.joinCode }}</span>
+      </div>
+    }
+    ```
+  </Step>
+
+  <Step title="Create Join Form">
+    Add a form where users can enter the join code:
+
+    ```typescript
+    export class Sidebar {
+      private boardService = inject(BoardService);
+      private router = inject(Router);
+      showJoin = false;
+      joinCode = '';
+
+      toggleJoin() {
+        this.showJoin = !this.showJoin;
+      }
+
+      cancelJoin() {
+        this.showJoin = false;
+        this.joinCode = '';
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Join the Board">
+    Call the `joinBoard` API method:
+
+    ```typescript
+    joinBoard() {
+      const code = this.joinCode.trim();
+      if (!code) return;
+
+      this.boardService.joinBoard({ joinCode: code })
+        .subscribe({
+          next: board => {
+            // Add to boards list
+            this.boards.update(list => [...list, board]);
+            
+            this.joinCode = '';
+            this.showJoin = false;
+            
+            // Navigate to the joined board
+            this.router.navigate(['/boards', board.id]);
+          },
+          error: err => {
+            console.error('Invalid join code or error:', err);
+          }
+        });
+    }
+    ```
+  </Step>
+
+  <Step title="Add Join Form Template">
+    ```html
+    @if (showJoin) {
+      <form (ngSubmit)="joinBoard()">
+        <input
+          type="text"
+          placeholder="Enter board code..."
+          [(ngModel)]="joinCode"
+          name="joinCode"
+          required
+        />
+
+        <button 
+          type="submit"
+          [disabled]="!joinCode.trim()">
+          Join Board
+        </button>
+
+        <button 
+          type="button"
+          (click)="cancelJoin()">
+          Cancel
+        </button>
+      </form>
+    }
+    ```
+  </Step>
+</Steps>
+
+## Complete Board Service API
+
+Here's the complete `BoardService` API reference:
+
+<CodeGroup>
+```typescript board.service.ts
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class BoardService {
+  private http = inject(HttpClient);
+  private apiUrl = 'https://localhost:7057/api/board';
+
+  // Get all boards for the current user
+  getMyBoards(): Observable<BoardSummary[]> {
+    return this.http.get<BoardSummary[]>(`${this.apiUrl}/my`);
+  }
+
+  // Get a single board with full details
+  getBoard(id: string): Observable<Board> {
+    return this.http.get<Board>(`${this.apiUrl}/${id}`);
+  }
+
+  // Create a new board
+  createBoard(data: { name: string }) {
+    return this.http.post<BoardSummary>(this.apiUrl, data);
+  }
+
+  // Update board name
+  updateBoard(id: number, name: string) {
+    return this.http.put<BoardSummary>(`${this.apiUrl}/${id}`, { name });
+  }
+
+  // Delete a board
+  deleteBoard(id: number) {
+    return this.http.delete(`${this.apiUrl}/${id}`);
+  }
+
+  // Join a board using join code
+  joinBoard(data: { joinCode: string }) {
+    return this.http.post<BoardSummary>(`${this.apiUrl}/join`, data);
+  }
+}
+```
+</CodeGroup>
+
+## Navigation and Routing
+
+Navigate to a board's detail page:
+
+```typescript
+import { Router } from '@angular/router';
+
+export class BoardListPage {
+  private router = inject(Router);
+
+  openBoard(id: number) {
+    this.router.navigate(['/boards', id]);
+  }
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Signals for Reactive State">
+    Use Angular signals for reactive board state management:
+
+    ```typescript
+    board = signal<Board | null>(null);
+    boards = signal<BoardSummary[]>([]);
+    ```
+  </Accordion>
+
+  <Accordion title="Handle Loading States">
+    Always show loading indicators while fetching boards:
+
+    ```typescript
+    isLoading = true;
+
+    ngOnInit() {
+      this.boardService.getMyBoards().subscribe({
+        next: data => {
+          this.boards = data;
+          this.isLoading = false;
+        },
+        error: err => {
+          console.error(err);
+          this.isLoading = false;
+        }
+      });
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Confirm Destructive Actions">
+    Always confirm before deleting boards to prevent accidental data loss.
+  </Accordion>
+
+  <Accordion title="Share Join Codes Securely">
+    Join codes provide access to your boards. Share them only with trusted team members.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Managing Columns" icon="table-columns" href="/guides/columns">
+    Learn how to create and organize columns within your boards
+  </Card>
+  <Card title="Managing Tasks" icon="list-check" href="/guides/tasks">
+    Discover how to create, edit, and organize tasks
+  </Card>
+</CardGroup>

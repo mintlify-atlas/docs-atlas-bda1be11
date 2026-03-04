@@ -1,0 +1,626 @@
+---
+title: 'State Management'
+description: 'Learn how TaskFlow uses Angular signals for reactive state management without complex libraries'
+---
+
+## Overview
+
+TaskFlow Angular uses **Angular Signals** as its primary state management solution. Signals provide fine-grained reactivity, automatic change detection, and better performance compared to traditional RxJS-based state management.
+
+<Info>
+Signals are a native Angular feature introduced in Angular 16 and stabilized in Angular 17. They provide a simpler alternative to RxJS for managing component state.
+</Info>
+
+## Why Signals?
+
+Signals offer several advantages over traditional state management:
+
+<CardGroup cols={2}>
+  <Card title="Fine-Grained Reactivity" icon="atom">
+    Only components that depend on changed signals re-render
+  </Card>
+  <Card title="Simpler Syntax" icon="code">
+    No need for complex RxJS operators or subscriptions
+  </Card>
+  <Card title="Type Safety" icon="shield-check">
+    Full TypeScript support with type inference
+  </Card>
+  <Card title="Better Performance" icon="gauge-high">
+    Automatic change detection with minimal overhead
+  </Card>
+</CardGroup>
+
+## Basic Signal Usage
+
+### Creating Signals
+
+Signals are created using the `signal()` function:
+
+```typescript title="Example: Simple Signal"
+import { Component, signal } from '@angular/core';
+
+@Component({
+  selector: 'app-root',
+  template: `<h1>{{ title() }}</h1>`
+})
+export class App {
+  // Create a signal with initial value
+  protected readonly title = signal('TaskFlowAngular');
+}
+```
+
+Key points:
+- Signals are created with an initial value
+- Access the value by calling the signal as a function: `title()`
+- Signals are reactive - when they change, templates automatically update
+
+### Reading Signal Values
+
+Read signal values by calling them as functions:
+
+```typescript
+const currentValue = this.title();  // 'TaskFlowAngular'
+```
+
+<Note>
+In templates, you must call signals as functions: `{{ title() }}`, not `{{ title }}`
+</Note>
+
+### Updating Signals
+
+Signals provide two methods for updates:
+
+<Tabs>
+  <Tab title="set()">
+    Replace the entire value:
+    
+    ```typescript
+    this.title.set('New Title');
+    ```
+  </Tab>
+  
+  <Tab title="update()">
+    Update based on the current value:
+    
+    ```typescript
+    this.count.update(current => current + 1);
+    ```
+  </Tab>
+</Tabs>
+
+## State Management Patterns in TaskFlow
+
+### Component-Level State
+
+TaskFlow uses signals for local component state. Here's a real example from the board list page:
+
+```typescript title="pages/boards/board-list-page/board-list-page.ts"
+import { Component, inject, OnInit } from '@angular/core';
+import { BoardService, BoardSummary } from '../../../services/board.service';
+
+export class BoardListPage implements OnInit {
+  private boardService = inject(BoardService);
+  
+  // Local state
+  boards: BoardSummary[] = [];
+  isLoading = true;
+
+  ngOnInit(): void {
+    this.boardService.getMyBoards().subscribe({
+      next: data => {
+        this.boards = data;
+        this.isLoading = false;
+      },
+      error: err => {
+        console.error(err);
+        this.isLoading = false;
+      }
+    });
+  }
+}
+```
+
+<Note>
+While this example doesn't use signals (it uses regular properties), signals would provide better reactivity and change detection.
+</Note>
+
+### Complex State with Signals
+
+The board detail page demonstrates advanced signal usage for managing complex, nested state:
+
+```typescript title="pages/boards/board-detail-page/board-detail-page.ts"
+import { Component, signal, inject, OnInit } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
+import { BoardService, Board, TaskItem } from '../../../services/board.service';
+
+@Component({
+  selector: 'app-board-detail-page',
+  imports: [Column, FormsModule],
+  templateUrl: './board-detail-page.html',
+  styleUrl: './board-detail-page.css',
+})
+export class BoardDetailPage implements OnInit {
+  private route = inject(ActivatedRoute);
+  private boardService = inject(BoardService);
+
+  // Signal holding the entire board state
+  board = signal<Board | null>(null);
+  
+  errorMessage = '';
+  showColumnForm = false;
+  newColumnName = '';
+
+  ngOnInit() {
+    this.route.paramMap.subscribe(params => {
+      const id = params.get('id');
+      if (!id) return;
+
+      // Reset state when route changes
+      this.board.set(null);
+
+      // Load new board data
+      this.boardService.getBoard(id).subscribe(board => {
+        this.board.set(board);
+      });
+    });
+  }
+}
+```
+
+### Immutable Updates Pattern
+
+TaskFlow follows the immutable update pattern for complex state. When updating nested data, always create new objects:
+
+```typescript title="Example: Adding a Task"
+handleTaskCreated(event: { columnId: number; task: TaskItem }) {
+  this.board.update(b => {
+    if (!b) return b;
+
+    return {
+      ...b,  // Spread the board
+      columns: b.columns.map(c =>
+        c.id === event.columnId
+          ? { ...c, tasks: [...c.tasks, event.task] }  // Add task to column
+          : c
+      )
+    };
+  });
+}
+```
+
+Breaking down this pattern:
+
+<Steps>
+  <Step title="Use update() method">
+    Call `update()` to transform the current value:
+    ```typescript
+    this.board.update(b => { ... });
+    ```
+  </Step>
+
+  <Step title="Handle null cases">
+    Always check for null/undefined before transforming:
+    ```typescript
+    if (!b) return b;
+    ```
+  </Step>
+
+  <Step title="Create new objects">
+    Use spread operators to create new objects, never mutate:
+    ```typescript
+    return { ...b, columns: [...] };
+    ```
+  </Step>
+
+  <Step title="Update nested structures">
+    Use `map()` to update specific items in arrays:
+    ```typescript
+    columns: b.columns.map(c =>
+      c.id === event.columnId ? { ...c, tasks: [...] } : c
+    )
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+**Never mutate signal values directly:**
+
+```typescript
+// ❌ BAD - Mutates the state
+this.board().columns.push(newColumn);
+
+// ✅ GOOD - Creates new state
+this.board.update(b => ({
+  ...b,
+  columns: [...b.columns, newColumn]
+}));
+```
+</Warning>
+
+## Real-World Examples
+
+### Example 1: Updating a Task
+
+```typescript title="pages/boards/board-detail-page/board-detail-page.ts"
+handleTaskUpdated(event: { columnId: number; task: TaskItem }) {
+  this.board.update(b => {
+    if (!b) return b;
+
+    return {
+      ...b,
+      columns: b.columns.map(c =>
+        c.id === event.columnId
+          ? {
+              ...c,
+              tasks: c.tasks.map(t =>
+                t.id === event.task.id ? event.task : t
+              )
+            }
+          : c
+      )
+    };
+  });
+}
+```
+
+This pattern:
+1. Updates the signal immutably
+2. Finds the correct column by ID
+3. Finds the correct task by ID
+4. Replaces the task with the updated version
+5. Leaves other columns and tasks unchanged
+
+### Example 2: Deleting a Task
+
+```typescript title="pages/boards/board-detail-page/board-detail-page.ts"
+handleTaskDeleted(event: { columnId: number; taskId: number }) {
+  this.board.update(b => {
+    if (!b) return b;
+
+    return {
+      ...b,
+      columns: b.columns.map(c =>
+        c.id === event.columnId
+          ? {
+              ...c,
+              tasks: c.tasks.filter(t => t.id !== event.taskId)
+            }
+          : c
+      )
+    };
+  });
+}
+```
+
+Using `filter()` to remove an item from an array while maintaining immutability.
+
+### Example 3: Deleting a Column
+
+```typescript title="pages/boards/board-detail-page/board-detail-page.ts"
+handleColumnDelete(columnId: number) {
+  this.board.update(b => {
+    if (!b) return b;
+    
+    return {
+      ...b,
+      columns: b.columns.filter(c => c.id !== columnId)
+    };
+  });
+}
+```
+
+Simple filter operation at the top level of the nested structure.
+
+### Example 4: Adding a Column
+
+```typescript title="pages/boards/board-detail-page/board-detail-page.ts"
+createColumn() {
+  if (!this.newColumnName.trim()) return;
+  if (!this.board()) return;
+  
+  this.columnService.createColumn({
+    boardId: this.board()!.id,
+    name: this.newColumnName
+  }).subscribe({
+    next: column => {
+      this.board.update(b => {
+        if (!b) return b;
+        return {
+          ...b,
+          columns: [
+            ...b.columns,
+            { ...column, tasks: [] }
+          ]
+        };
+      });
+      this.newColumnName = '';
+      this.showColumnForm = false;
+    },
+    error: err => {
+      if (err.status === 403) {
+        this.errorMessage = 'No tienes permisos para crear columnas en este tablero.';
+      } else {
+        this.errorMessage = 'Error al crear la columna.';
+      }
+    }
+  });
+}
+```
+
+This example shows:
+- Reading signal values: `this.board()`
+- Making an API call
+- Updating the signal on success
+- Appending a new column to the array
+
+## Signals vs RxJS
+
+TaskFlow uses both signals and RxJS, each for their strengths:
+
+<Tabs>
+  <Tab title="Signals">
+    **Use signals for:**
+    - Component state
+    - Synchronous updates
+    - Simple reactivity
+    - Template bindings
+    
+    ```typescript
+    board = signal<Board | null>(null);
+    
+    this.board.set(newBoard);
+    ```
+  </Tab>
+  
+  <Tab title="RxJS">
+    **Use RxJS for:**
+    - HTTP requests
+    - Asynchronous operations
+    - Complex data transformations
+    - Event streams
+    
+    ```typescript
+    this.boardService.getBoard(id).subscribe(board => {
+      this.board.set(board);
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Bridging RxJS and Signals
+
+A common pattern is to use RxJS for async operations and signals for state:
+
+```typescript
+ngOnInit() {
+  // RxJS for the HTTP call
+  this.route.paramMap.subscribe(params => {
+    const id = params.get('id');
+    if (!id) return;
+
+    this.board.set(null);  // Signal for state
+
+    this.boardService.getBoard(id).subscribe(board => {
+      this.board.set(board);  // Store result in signal
+    });
+  });
+}
+```
+
+## Signal Type Safety
+
+Signals work seamlessly with TypeScript:
+
+```typescript
+// Typed signal
+board = signal<Board | null>(null);
+
+// TypeScript knows the type
+const board = this.board();  // Board | null
+
+if (board) {
+  // TypeScript narrows the type
+  console.log(board.name);  // string
+  console.log(board.columns);  // TaskColumn[]
+}
+```
+
+### Complex Type Examples
+
+```typescript title="Type Definitions"
+// From board.service.ts
+export interface TaskItem {
+  id: number;
+  title: string;
+  description: string;
+}
+
+export interface TaskColumn {
+  id: number;
+  name: string;
+  tasks: TaskItem[];
+}
+
+export interface Board {
+  id: number;
+  name: string;
+  joinCode: string;
+  columns: TaskColumn[];
+}
+
+// Usage in component
+board = signal<Board | null>(null);
+```
+
+## Advanced Patterns
+
+### Computed Signals
+
+While not heavily used in TaskFlow, computed signals derive values from other signals:
+
+```typescript title="Example: Computed Signal"
+import { computed } from '@angular/core';
+
+export class BoardDetailPage {
+  board = signal<Board | null>(null);
+  
+  // Automatically updates when board changes
+  columnCount = computed(() => this.board()?.columns.length ?? 0);
+  taskCount = computed(() => 
+    this.board()?.columns.reduce((sum, col) => sum + col.tasks.length, 0) ?? 0
+  );
+}
+```
+
+### Signal Effects
+
+Effects run side effects when signals change:
+
+```typescript title="Example: Signal Effect"
+import { effect } from '@angular/core';
+
+export class BoardDetailPage {
+  board = signal<Board | null>(null);
+  
+  constructor() {
+    // Runs whenever board signal changes
+    effect(() => {
+      const board = this.board();
+      if (board) {
+        console.log(`Board ${board.name} loaded with ${board.columns.length} columns`);
+      }
+    });
+  }
+}
+```
+
+<Warning>
+Use effects sparingly. Prefer computed signals or template expressions for most reactivity needs.
+</Warning>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Immutable Updates" icon="lock">
+    Always create new objects when updating signals, never mutate.
+  </Card>
+  <Card title="Type Safety" icon="shield-check">
+    Provide explicit types for all signals: `signal<Type | null>(null)`
+  </Card>
+  <Card title="Null Checks" icon="circle-exclamation">
+    Always handle null/undefined cases in update functions.
+  </Card>
+  <Card title="Keep It Simple" icon="lightbulb">
+    Use signals for state, RxJS for async operations.
+  </Card>
+</CardGroup>
+
+### Common Patterns
+
+```typescript
+// ✅ GOOD: Clear, type-safe, immutable
+board = signal<Board | null>(null);
+
+addTask(columnId: number, task: TaskItem) {
+  this.board.update(b => {
+    if (!b) return b;
+    return {
+      ...b,
+      columns: b.columns.map(c =>
+        c.id === columnId
+          ? { ...c, tasks: [...c.tasks, task] }
+          : c
+      )
+    };
+  });
+}
+
+// ❌ BAD: Mutates state
+addTask(columnId: number, task: TaskItem) {
+  const board = this.board();
+  if (board) {
+    const column = board.columns.find(c => c.id === columnId);
+    column?.tasks.push(task);  // Mutation!
+  }
+}
+```
+
+## Change Detection Integration
+
+Signals automatically trigger change detection, eliminating the need for manual `ChangeDetectorRef` calls in most cases:
+
+```typescript
+// With signals - automatic change detection
+board = signal<Board | null>(null);
+
+updateBoard(board: Board) {
+  this.board.set(board);  // Change detection triggered automatically
+}
+
+// Without signals - manual change detection
+board: Board | null = null;
+
+updateBoard(board: Board) {
+  this.board = board;
+  this.cdr.detectChanges();  // Manual trigger required
+}
+```
+
+<Info>
+TaskFlow still uses `ChangeDetectorRef` in some places for backward compatibility, but signals reduce this need significantly.
+</Info>
+
+## Migration Tips
+
+If you're migrating from traditional state management:
+
+<Steps>
+  <Step title="Identify Component State">
+    Find properties that represent component state:
+    ```typescript
+    boards: BoardSummary[] = [];
+    isLoading = true;
+    ```
+  </Step>
+
+  <Step title="Convert to Signals">
+    Replace with signal declarations:
+    ```typescript
+    boards = signal<BoardSummary[]>([]);
+    isLoading = signal(true);
+    ```
+  </Step>
+
+  <Step title="Update Assignments">
+    Replace `=` with `.set()` or `.update()`:
+    ```typescript
+    // Before
+    this.boards = newBoards;
+    
+    // After
+    this.boards.set(newBoards);
+    ```
+  </Step>
+
+  <Step title="Update Templates">
+    Add `()` to signal references:
+    ```html
+    <!-- Before -->
+    <div *ngIf="isLoading">Loading...</div>
+    
+    <!-- After -->
+    <div *ngIf="isLoading()">Loading...</div>
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/core/architecture">
+    Learn about the application architecture and component structure
+  </Card>
+  <Card title="Authentication" icon="lock" href="/core/authentication">
+    Understand JWT authentication and route guards
+  </Card>
+</CardGroup>

@@ -1,0 +1,357 @@
+---
+title: 'TaskModal Component'
+description: 'Modal dialog for creating, editing, and viewing task details'
+---
+
+## Overview
+
+The TaskModal component is a modal dialog that handles task creation, editing, and viewing. It uses Angular signals for reactive state management and provides a clean interface for task data entry.
+
+## Component Signature
+
+```typescript
+import { TaskModal } from '@app/components/task/task-modal/task-modal';
+```
+
+## Inputs
+
+<ParamField path="task" type="TaskItem | null" default="null">
+  The task to edit or view. Pass `null` when creating a new task.
+  
+  ```typescript
+  interface TaskItem {
+    id: number;
+    title: string;
+    description: string;
+  }
+  ```
+</ParamField>
+
+<ParamField path="mode" type="'create' | 'edit' | 'view'" default="'create'">
+  The modal operation mode:
+  - `create`: Create a new task
+  - `edit`: Edit an existing task
+  - `view`: View task details (read-only)
+</ParamField>
+
+## Outputs
+
+<ParamField path="close" type="EventEmitter<void>">
+  Emitted when the modal is closed via the close button
+</ParamField>
+
+<ParamField path="save" type="EventEmitter<{title: string, description: string}>">
+  Emitted when the save button is clicked with the form data. Only emitted in `create` or `edit` modes.
+</ParamField>
+
+## TypeScript Interfaces
+
+```typescript
+interface TaskItem {
+  id: number;
+  title: string;
+  description: string;
+}
+
+interface TaskModalSaveEvent {
+  title: string;
+  description: string;
+}
+```
+
+## Usage
+
+### Create Mode
+
+```html
+@if (showCreateModal) {
+  <app-task-modal
+    [mode]="'create'"
+    (close)="showCreateModal = false"
+    (save)="handleCreateTask($event)">
+  </app-task-modal>
+}
+```
+
+```typescript
+showCreateModal = false;
+
+openCreateModal() {
+  this.showCreateModal = true;
+}
+
+handleCreateTask(data: { title: string; description: string }) {
+  this.taskService.createTask({
+    columnId: this.currentColumnId,
+    title: data.title,
+    description: data.description
+  }).subscribe({
+    next: (task) => {
+      this.tasks.push(task);
+      this.showCreateModal = false;
+    },
+    error: (err) => console.error('Failed to create task:', err)
+  });
+}
+```
+
+### Edit Mode
+
+```html
+@if (showEditModal) {
+  <app-task-modal
+    [task]="selectedTask"
+    [mode]="'edit'"
+    (close)="showEditModal = false"
+    (save)="handleUpdateTask($event)">
+  </app-task-modal>
+}
+```
+
+```typescript
+showEditModal = false;
+selectedTask: TaskItem | null = null;
+
+openEditModal(task: TaskItem) {
+  this.selectedTask = task;
+  this.showEditModal = true;
+}
+
+handleUpdateTask(data: { title: string; description: string }) {
+  if (!this.selectedTask) return;
+  
+  this.taskService.updateTask(this.selectedTask.id, {
+    title: data.title,
+    description: data.description
+  }).subscribe({
+    next: (updatedTask) => {
+      const index = this.tasks.findIndex(t => t.id === updatedTask.id);
+      if (index !== -1) {
+        this.tasks[index] = updatedTask;
+      }
+      this.showEditModal = false;
+    },
+    error: (err) => console.error('Failed to update task:', err)
+  });
+}
+```
+
+### View Mode
+
+```html
+@if (showViewModal) {
+  <app-task-modal
+    [task]="selectedTask"
+    [mode]="'view'"
+    (close)="showViewModal = false">
+  </app-task-modal>
+}
+```
+
+```typescript
+showViewModal = false;
+
+openViewModal(task: TaskItem) {
+  this.selectedTask = task;
+  this.showViewModal = true;
+}
+```
+
+### Complete Example
+
+```typescript
+import { Component } from '@angular/core';
+import { TaskModal } from '@app/components/task/task-modal/task-modal';
+import { TaskItem } from '@app/services/board.service';
+import { TaskService } from '@app/services/task.service';
+
+@Component({
+  selector: 'app-task-manager',
+  imports: [TaskModal],
+  template: `
+    <button (click)="openCreateModal()">New Task</button>
+
+    @for (task of tasks; track task.id) {
+      <div class="task-item">
+        <span>{{ task.title }}</span>
+        <button (click)="openEditModal(task)">Edit</button>
+      </div>
+    }
+
+    @if (showModal) {
+      <app-task-modal
+        [task]="selectedTask"
+        [mode]="modalMode"
+        (close)="closeModal()"
+        (save)="handleSave($event)">
+      </app-task-modal>
+    }
+  `
+})
+export class TaskManagerComponent {
+  showModal = false;
+  selectedTask: TaskItem | null = null;
+  modalMode: 'create' | 'edit' | 'view' = 'create';
+  tasks: TaskItem[] = [];
+
+  constructor(private taskService: TaskService) {}
+
+  openCreateModal() {
+    this.selectedTask = null;
+    this.modalMode = 'create';
+    this.showModal = true;
+  }
+
+  openEditModal(task: TaskItem) {
+    this.selectedTask = task;
+    this.modalMode = 'edit';
+    this.showModal = true;
+  }
+
+  closeModal() {
+    this.showModal = false;
+  }
+
+  handleSave(data: { title: string; description: string }) {
+    if (this.modalMode === 'create') {
+      this.taskService.createTask({
+        columnId: 1,
+        title: data.title,
+        description: data.description
+      }).subscribe(task => {
+        this.tasks.push(task);
+        this.closeModal();
+      });
+    } else if (this.modalMode === 'edit' && this.selectedTask) {
+      this.taskService.updateTask(this.selectedTask.id, data)
+        .subscribe(updated => {
+          const index = this.tasks.findIndex(t => t.id === updated.id);
+          if (index !== -1) {
+            this.tasks[index] = updated;
+          }
+          this.closeModal();
+        });
+    }
+  }
+}
+```
+
+## Features
+
+### Angular Signals
+
+The component uses Angular signals for reactive form state:
+
+```typescript
+title = signal('');
+description = signal('');
+
+// In template
+<input
+  type="text"
+  [value]="title()"
+  (input)="title.set($any($event.target).value)"
+/>
+```
+
+### Mode-Based UI
+
+The modal adapts its UI based on the mode:
+
+- **Create**: Shows "Nueva Tarea" title, editable fields, save button
+- **Edit**: Shows "Editar Tarea" title, editable fields, save button
+- **View**: Shows "Detalle Tarea" title, disabled fields, no save button
+
+### Form Validation
+
+The modal includes basic validation:
+- Title is required (trim check)
+- Save button disabled while saving
+- Save button only shown in create/edit modes
+
+```typescript
+onSave() {
+  if (!this.title().trim()) return;
+  
+  this.isSaving = true;
+  this.save.emit({
+    title: this.title(),
+    description: this.description()
+  });
+}
+```
+
+## State Management
+
+### Initialization
+
+When editing a task, the modal initializes form state in `ngOnInit`:
+
+```typescript
+ngOnInit() {
+  if (this.task) {
+    this.title.set(this.task.title);
+    this.description.set(this.task.description || '');
+  }
+}
+```
+
+### Saving State
+
+The `isSaving` flag prevents duplicate submissions:
+
+```typescript
+isSaving = false;
+
+onSave() {
+  if (!this.title().trim()) return;
+  this.isSaving = true;
+  // Emit save event
+}
+
+resetSaving() {
+  this.isSaving = false;
+}
+```
+
+## Styling
+
+The modal includes:
+- Full-screen backdrop overlay
+- Centered modal dialog
+- Form inputs and textarea
+- Action buttons (Close, Save)
+- Loading state on save button
+
+## Best Practices
+
+### Modal Lifecycle
+
+1. Parent controls modal visibility via `@if` directive
+2. Parent sets mode and optional task data
+3. Modal emits save event with form data
+4. Parent handles API call and updates state
+5. Parent closes modal on success
+
+### Error Handling
+
+The parent component should handle errors:
+
+```typescript
+handleSave(data: { title: string; description: string }) {
+  this.taskService.createTask(data).subscribe({
+    next: (task) => {
+      this.tasks.push(task);
+      this.closeModal();
+    },
+    error: (err) => {
+      console.error(err);
+      // Keep modal open, show error message
+    }
+  });
+}
+```
+
+## Source Code Reference
+
+Component implementation: `src/app/components/task/task-modal/task-modal.ts:12`

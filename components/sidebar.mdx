@@ -1,0 +1,374 @@
+---
+title: 'Sidebar Component'
+description: 'Navigation sidebar with board management functionality'
+icon: 'sidebar'
+---
+
+## Overview
+
+The `Sidebar` component provides navigation functionality and board management features. It displays a list of user boards, allows creating new boards, joining boards via code, and includes logout functionality.
+
+## Component Signature
+
+```typescript sidebar.ts
+import { Component, inject, OnInit, signal } from '@angular/core';
+import { Router, RouterLink, RouterModule } from '@angular/router';
+import { BoardService, BoardSummary } from '../../../services/board.service';
+import { CommonModule } from '@angular/common';
+import { AuthService } from '../../../services/auth.service';
+import { FormsModule } from '@angular/forms';
+import { ChangeDetectorRef } from '@angular/core';
+
+@Component({
+  selector: 'app-sidebar',
+  standalone: true,
+  imports: [CommonModule, RouterModule, FormsModule, RouterLink],
+  templateUrl: './sidebar.html',
+  styleUrl: './sidebar.css',
+})
+export class Sidebar implements OnInit {
+  private boardService = inject(BoardService);
+  private router = inject(Router);
+  private authService = inject(AuthService);
+  private cdr = inject(ChangeDetectorRef);
+
+  boards = signal<BoardSummary[]>([]);
+  activeBoardId = signal<number | null>(null);
+  showCreate = false;
+  newBoardName = '';
+  showJoin = false;
+  joinCode = '';
+}
+```
+
+## Properties
+
+<ParamField path="boards" type="Signal<BoardSummary[]>">
+  Signal containing the list of boards the user has access to. Updated when boards are loaded, created, or joined.
+</ParamField>
+
+<ParamField path="activeBoardId" type="Signal<number | null>">
+  Signal containing the currently active board ID based on the router URL. Used to highlight the active board in the navigation.
+</ParamField>
+
+<ParamField path="showCreate" type="boolean" default="false">
+  Controls the visibility of the create board form.
+</ParamField>
+
+<ParamField path="newBoardName" type="string" default="''">
+  Two-way bound value for the new board name input field.
+</ParamField>
+
+<ParamField path="showJoin" type="boolean" default="false">
+  Controls the visibility of the join board form.
+</ParamField>
+
+<ParamField path="joinCode" type="string" default="''">
+  Two-way bound value for the join code input field.
+</ParamField>
+
+## Methods
+
+### ngOnInit()
+
+Initializes the component by loading boards and subscribing to router events to track the active board.
+
+```typescript
+ngOnInit() {
+  this.loadBoards();
+  
+  this.router.events.subscribe(() => {
+    const url = this.router.url;
+    const match = url.match(/boards\/(\d+)/);
+    this.cdr.detectChanges();
+    this.activeBoardId.set(match ? +match[1] : null);
+  });
+}
+```
+
+### loadBoards()
+
+Fetches the user's boards from the BoardService and updates the boards signal.
+
+```typescript
+loadBoards() {
+  this.boardService.getMyBoards().subscribe(data => {
+    this.boards.set(data);
+  });
+}
+```
+
+### goToBoard(id: number)
+
+Navigates to the specified board detail page.
+
+<ParamField path="id" type="number" required>
+  The ID of the board to navigate to
+</ParamField>
+
+### logout()
+
+Logs out the current user and navigates to the login page.
+
+```typescript
+logout() {
+  this.authService.logout();
+  this.router.navigate(['/login']);
+}
+```
+
+### toggleCreate()
+
+Toggles the visibility of the create board form.
+
+### createBoard()
+
+Creates a new board with the specified name and navigates to it.
+
+```typescript
+createBoard() {
+  const name = this.newBoardName.trim();
+  if (!name) return;
+
+  this.boardService.createBoard({ name })
+    .subscribe({
+      next: board => {
+        this.boards.update(list => [...list, board]);
+        this.newBoardName = '';
+        this.showCreate = false;
+        this.router.navigate(['/boards', board.id]);
+      },
+      error: err => {
+        console.error(err);
+      }
+    });
+}
+```
+
+### cancelCreate()
+
+Cancels board creation and resets the form.
+
+### toggleJoin()
+
+Toggles the visibility of the join board form and hides the create form.
+
+### joinBoard()
+
+Joins an existing board using a join code.
+
+```typescript
+joinBoard() {
+  const code = this.joinCode.trim();
+  if (!code) return;
+
+  this.boardService.joinBoard({ joinCode: code })
+    .subscribe({
+      next: board => {
+        this.boards.update(list => [...list, board]);
+        this.joinCode = '';
+        this.showJoin = false;
+        this.router.navigate(['/boards', board.id]);
+      },
+      error: err => console.error(err)
+    });
+}
+```
+
+### cancelJoin()
+
+Cancels board joining and resets the form.
+
+## Usage
+
+The Sidebar component is used within the Layout component:
+
+```typescript
+import { Sidebar } from './components/layout/sidebar/sidebar';
+
+@Component({
+  selector: 'app-layout',
+  imports: [Sidebar],
+  template: `
+    <div class="app-layout">
+      <div class="main-area">
+        <app-sidebar></app-sidebar>
+        <div class="content">
+          <router-outlet></router-outlet>
+        </div>
+      </div>
+    </div>
+  `
+})
+export class Layout { }
+```
+
+## Template Features
+
+The sidebar template includes several key sections:
+
+### Navigation Items
+
+```html
+<div class="sidebar-nav">
+  <a routerLink="/boards" routerLinkActive="active" class="nav-item">
+    Mis tableros
+  </a>
+  
+  <button class="nav-item" (click)="toggleCreate()">
+    Nuevo tablero
+  </button>
+  
+  <button class="nav-item" (click)="toggleJoin()">
+    Unirse por código
+  </button>
+</div>
+```
+
+### Create Board Form
+
+```html
+@if (showCreate) {
+  <form class="create-form" (ngSubmit)="createBoard()" (keydown.escape)="cancelCreate()">
+    <input
+      type="text"
+      placeholder="Nombre del tablero..."
+      [(ngModel)]="newBoardName"
+      name="boardName"
+      required
+      autocomplete="off"
+    />
+    
+    <div class="form-actions">
+      <button type="submit" [disabled]="!newBoardName.trim()">
+        Crear
+      </button>
+      <button type="button" (click)="cancelCreate()">
+        Cancelar
+      </button>
+    </div>
+  </form>
+}
+```
+
+### Join Board Form
+
+```html
+@if (showJoin) {
+  <form class="create-form" (ngSubmit)="joinBoard()" (keydown.escape)="cancelJoin()">
+    <input
+      type="text"
+      placeholder="Código del tablero..."
+      [(ngModel)]="joinCode"
+      name="joinCode"
+      required
+      autocomplete="off"
+    />
+    
+    <div class="form-actions">
+      <button type="submit" [disabled]="!joinCode.trim()">
+        Unirse
+      </button>
+      <button type="button" (click)="cancelJoin()">
+        Cancelar
+      </button>
+    </div>
+  </form>
+}
+```
+
+### Boards List
+
+```html
+<div class="boards-list">
+  @for (board of boards(); track board.id) {
+    <a
+      class="board-item"
+      [routerLink]="['/boards/', board.id]"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      {{ board.name }}
+    </a>
+  }
+</div>
+```
+
+<Info>
+  The Sidebar uses Angular's new control flow syntax (`@if`, `@for`) available in Angular 17+.
+</Info>
+
+## Dependencies
+
+The Sidebar component depends on the following services:
+
+### BoardService
+
+Provides methods for board management:
+- `getMyBoards()`: Retrieves user's boards
+- `createBoard(data)`: Creates a new board
+- `joinBoard(data)`: Joins a board by code
+
+### AuthService
+
+Provides authentication methods:
+- `logout()`: Logs out the current user
+
+### Router
+
+Used for navigation and tracking the current route.
+
+## Related Components
+
+<CardGroup cols={2}>
+  <Card title="Layout" icon="grid" href="./layout">
+    Main application layout wrapper
+  </Card>
+  <Card title="Header" icon="window-frame-open" href="./header">
+    Top navigation bar component
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use signals for reactive state">
+    The component uses Angular signals for `boards` and `activeBoardId`, providing reactive updates without explicit change detection.
+  </Accordion>
+  
+  <Accordion title="Handle keyboard shortcuts">
+    The forms include `(keydown.escape)` handlers to allow users to quickly cancel operations, improving UX.
+  </Accordion>
+  
+  <Accordion title="Validate input before submission">
+    Both create and join forms validate that the input is not empty using `[disabled]="!value.trim()"` on submit buttons.
+  </Accordion>
+  
+  <Accordion title="Update local state optimistically">
+    After creating or joining a board, the component updates the local `boards` signal immediately before navigating, providing instant feedback.
+  </Accordion>
+</AccordionGroup>
+
+## Example: Custom Sidebar Navigation
+
+You can extend the Sidebar to include additional navigation items:
+
+```typescript
+<div class="sidebar-nav">
+  <a routerLink="/boards" routerLinkActive="active" class="nav-item">
+    My Boards
+  </a>
+  
+  <a routerLink="/templates" routerLinkActive="active" class="nav-item">
+    Templates
+  </a>
+  
+  <a routerLink="/settings" routerLinkActive="active" class="nav-item">
+    Settings
+  </a>
+  
+  <button class="nav-item" (click)="toggleCreate()">
+    New Board
+  </button>
+</div>
+```

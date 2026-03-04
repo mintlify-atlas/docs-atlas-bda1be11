@@ -1,0 +1,172 @@
+---
+title: 'TaskCard Component'
+description: 'Display component for individual task items in the Kanban board'
+---
+
+## Overview
+
+The TaskCard component is a presentational component that displays a task's title and truncated description. It provides a delete button and emits click events for task interaction.
+
+## Component Signature
+
+```typescript
+import { TaskCard } from '@app/components/task/task-card/task-card';
+```
+
+## Inputs
+
+<ParamField path="task" type="TaskItem" required>
+  The task data to display
+  
+  ```typescript
+  interface TaskItem {
+    id: number;
+    title: string;
+    description: string;
+  }
+  ```
+</ParamField>
+
+## Outputs
+
+<ParamField path="delete" type="EventEmitter<number>">
+  Emitted when the delete button is clicked. Event propagation is stopped to prevent triggering parent click handlers.
+</ParamField>
+
+## TypeScript Interfaces
+
+```typescript
+interface TaskItem {
+  id: number;
+  title: string;
+  description: string;
+}
+```
+
+## Usage
+
+### Basic Example
+
+```html
+<app-task-card
+  [task]="task"
+  (click)="openTaskDetails(task)"
+  (delete)="deleteTask(task.id)">
+</app-task-card>
+```
+
+### Component TypeScript
+
+```typescript
+import { Component } from '@angular/core';
+import { TaskCard } from '@app/components/task/task-card/task-card';
+import { TaskItem } from '@app/services/board.service';
+
+@Component({
+  selector: 'app-task-list',
+  imports: [TaskCard],
+  template: `
+    @for (task of tasks; track task.id) {
+      <app-task-card
+        [task]="task"
+        (click)="openTaskDetails(task)"
+        (delete)="deleteTask(task.id)">
+      </app-task-card>
+    }
+  `
+})
+export class TaskListComponent {
+  tasks: TaskItem[] = [
+    {
+      id: 1,
+      title: 'Implement login feature',
+      description: 'Add authentication with JWT tokens and secure storage'
+    },
+    {
+      id: 2,
+      title: 'Fix responsive layout',
+      description: 'Mobile view needs adjustment for tablets'
+    }
+  ];
+
+  openTaskDetails(task: TaskItem) {
+    console.log('Opening task:', task.id);
+    // Open modal or navigate to detail view
+  }
+
+  deleteTask(taskId: number) {
+    this.tasks = this.tasks.filter(t => t.id !== taskId);
+  }
+}
+```
+
+### With Drag and Drop
+
+```html
+<div cdkDropList>
+  @for (task of tasks; track task.id) {
+    <div cdkDrag [cdkDragData]="task">
+      <app-task-card
+        [task]="task"
+        (click)="openTaskDetails(task)"
+        (delete)="deleteTask(task.id)">
+      </app-task-card>
+    </div>
+  }
+</div>
+```
+
+## Features
+
+### Description Truncation
+
+Task descriptions longer than 30 characters are automatically truncated to 35 characters with an ellipsis:
+
+```typescript
+// Template logic
+task.description.length > 30 
+  ? (task.description | slice:0:35) + '...' 
+  : task.description
+```
+
+### Event Handling
+
+The delete button stops event propagation to prevent triggering parent click handlers:
+
+```typescript
+onDelete(event: Event) {
+  event.stopPropagation();
+  this.delete.emit();
+}
+```
+
+This allows the card to be clickable for viewing details while keeping the delete action separate.
+
+## Styling
+
+The component uses scoped CSS (`task-card.css`) and includes:
+- Card container with hover effects
+- Delete button positioned in the top-right corner
+- Title and description text styling
+- Responsive layout
+
+## Design Patterns
+
+### Presentational Component
+
+TaskCard follows the presentational component pattern:
+- No business logic or service injection
+- Receives data via `@Input`
+- Communicates via `@Output` events
+- Reusable and testable in isolation
+
+### Event Bubbling Control
+
+The component demonstrates proper event handling:
+- Delete action stops propagation with `event.stopPropagation()`
+- Card click events bubble up to parent handlers
+- Clean separation between card and delete interactions
+
+## Source Code Reference
+
+Component implementation: `src/app/components/task/task-card/task-card.ts:11`

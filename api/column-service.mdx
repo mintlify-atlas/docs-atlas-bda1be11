@@ -1,0 +1,358 @@
+---
+title: 'ColumnService'
+description: 'Service for managing board columns including creation, updates, deletion, and reordering'
+---
+
+## Overview
+
+The `ColumnService` handles all column-related operations within boards. It provides methods to create, update, delete, and reorder columns. Columns serve as containers for tasks in the TaskFlow board structure.
+
+## Import
+
+```typescript
+import { ColumnService } from './services/column.service';
+import type { Column } from './services/column.service';
+```
+
+## Interfaces
+
+### Column
+
+Represents a column in a board.
+
+```typescript
+export interface Column {
+  id: number;        // Unique column identifier
+  name: string;      // Column name (e.g., "To Do", "In Progress", "Done")
+  position: number;  // Column order position in the board
+  boardId: number;   // ID of the board this column belongs to
+}
+```
+
+## Methods
+
+### createColumn()
+
+Creates a new column in a board.
+
+<ParamField path="data" type="object" required>
+  Column creation data
+  
+  <ParamField path="data.boardId" type="number" required>
+    The ID of the board where the column will be created
+  </ParamField>
+  
+  <ParamField path="data.name" type="string" required>
+    The name for the new column
+  </ParamField>
+</ParamField>
+
+**Returns:** `Observable<Column>` - The newly created column
+
+**Implementation:**
+```typescript
+createColumn(data: { boardId: number; name: string }): Observable<Column> {
+  return this.http.post<Column>(this.apiUrl, data);
+}
+```
+
+**Usage Example:**
+```typescript
+const columnService = inject(ColumnService);
+
+columnService.createColumn({
+  boardId: 123,
+  name: 'In Progress'
+}).subscribe({
+  next: (column) => {
+    console.log('Column created:', column.name);
+    console.log('Column ID:', column.id);
+    console.log('Position:', column.position);
+  },
+  error: (error) => {
+    console.error('Failed to create column', error);
+  }
+});
+```
+
+---
+
+### updateColumn()
+
+Updates a column's name.
+
+<ParamField path="id" type="number" required>
+  The column ID to update
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  The new name for the column
+</ParamField>
+
+**Returns:** `Observable<Column>` - The updated column
+
+**Implementation:**
+```typescript
+updateColumn(id: number, name: string): Observable<Column> {
+  return this.http.put<Column>(`${this.apiUrl}/${id}`, { name });
+}
+```
+
+**Usage Example:**
+```typescript
+const columnService = inject(ColumnService);
+
+columnService.updateColumn(456, 'Ready for Review').subscribe({
+  next: (column) => {
+    console.log('Column updated:', column.name);
+  },
+  error: (error) => {
+    console.error('Failed to update column', error);
+  }
+});
+```
+
+---
+
+### deleteColumn()
+
+Deletes a column from a board.
+
+<ParamField path="id" type="number" required>
+  The column ID to delete
+</ParamField>
+
+**Returns:** `Observable<any>`
+
+<Warning>
+  Deleting a column may also delete all tasks within that column, depending on backend configuration.
+</Warning>
+
+**Implementation:**
+```typescript
+deleteColumn(id: number) {
+  return this.http.delete(`${this.apiUrl}/${id}`);
+}
+```
+
+**Usage Example:**
+```typescript
+const columnService = inject(ColumnService);
+
+columnService.deleteColumn(456).subscribe({
+  next: () => {
+    console.log('Column deleted successfully');
+  },
+  error: (error) => {
+    console.error('Failed to delete column', error);
+  }
+});
+```
+
+---
+
+### moveColumn()
+
+Moves a column to a new position in the board.
+
+<ParamField path="id" type="number" required>
+  The column ID to move
+</ParamField>
+
+<ParamField path="newPosition" type="number" required>
+  The target position (0-indexed)
+</ParamField>
+
+**Returns:** `Observable<Column>` - The moved column with updated position
+
+**Implementation:**
+```typescript
+moveColumn(id: number, newPosition: number): Observable<Column> {
+  return this.http.put<Column>(`${this.apiUrl}/${id}/move`, {
+    newPosition
+  });
+}
+```
+
+**Usage Example:**
+```typescript
+const columnService = inject(ColumnService);
+
+// Move column to first position
+columnService.moveColumn(456, 0).subscribe({
+  next: (column) => {
+    console.log('Column moved to position:', column.position);
+  },
+  error: (error) => {
+    console.error('Failed to move column', error);
+  }
+});
+```
+
+## Configuration
+
+**API Endpoint:** `https://localhost:7057/api/column`
+
+**Provider:** Registered in root module (`providedIn: 'root'`)
+
+## Dependencies
+
+- `HttpClient` - For making HTTP requests to the backend API
+- `rxjs` - Uses `Observable` for reactive data streams
+
+## Complete Example
+
+```typescript
+import { Component, inject, Input, OnInit } from '@angular/core';
+import { ColumnService, Column } from './services/column.service';
+import { BoardService } from './services/board.service';
+
+@Component({
+  selector: 'app-column-manager',
+  template: `
+    <div class="column-manager">
+      <h3>Columns</h3>
+      <button (click)="addColumn()">Add Column</button>
+      
+      <div class="columns" cdkDropList (cdkDropListDropped)="onColumnDrop($event)">
+        <div *ngFor="let column of columns; let i = index" 
+             class="column" 
+             cdkDrag>
+          <div class="column-header">
+            <h4>{{ column.name }}</h4>
+            <button (click)="editColumn(column)">Edit</button>
+            <button (click)="removeColumn(column.id)">Delete</button>
+          </div>
+          <p>Position: {{ column.position }}</p>
+        </div>
+      </div>
+    </div>
+  `,
+  styles: [`
+    .columns {
+      display: flex;
+      gap: 1rem;
+    }
+    .column {
+      min-width: 250px;
+      padding: 1rem;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+  `]
+})
+export class ColumnManagerComponent implements OnInit {
+  @Input() boardId!: number;
+  
+  private columnService = inject(ColumnService);
+  private boardService = inject(BoardService);
+  
+  columns: Column[] = [];
+
+  ngOnInit() {
+    this.loadColumns();
+  }
+
+  loadColumns() {
+    // Load board to get columns
+    this.boardService.getBoard(this.boardId.toString()).subscribe({
+      next: (board) => {
+        // Extract columns with their positions
+        this.columns = board.columns.map((col, index) => ({
+          id: col.id,
+          name: col.name,
+          position: index,
+          boardId: this.boardId
+        }));
+      },
+      error: (err) => console.error('Error loading columns:', err)
+    });
+  }
+
+  addColumn() {
+    const name = prompt('Enter column name:');
+    if (name) {
+      this.columnService.createColumn({
+        boardId: this.boardId,
+        name
+      }).subscribe({
+        next: (column) => {
+          console.log('Column created:', column);
+          this.loadColumns();
+        },
+        error: (err) => console.error('Error creating column:', err)
+      });
+    }
+  }
+
+  editColumn(column: Column) {
+    const newName = prompt('Enter new column name:', column.name);
+    if (newName && newName !== column.name) {
+      this.columnService.updateColumn(column.id, newName).subscribe({
+        next: () => this.loadColumns(),
+        error: (err) => console.error('Error updating column:', err)
+      });
+    }
+  }
+
+  removeColumn(id: number) {
+    if (confirm('Delete this column and all its tasks?')) {
+      this.columnService.deleteColumn(id).subscribe({
+        next: () => {
+          console.log('Column deleted');
+          this.loadColumns();
+        },
+        error: (err) => console.error('Error deleting column:', err)
+      });
+    }
+  }
+
+  onColumnDrop(event: any) {
+    // Handle drag and drop reordering
+    const column = this.columns[event.previousIndex];
+    const newPosition = event.currentIndex;
+    
+    this.columnService.moveColumn(column.id, newPosition).subscribe({
+      next: () => {
+        console.log('Column moved to position', newPosition);
+        this.loadColumns();
+      },
+      error: (err) => console.error('Error moving column:', err)
+    });
+  }
+}
+```
+
+## Common Workflows
+
+### Creating a Standard Board Layout
+
+```typescript
+const columnService = inject(ColumnService);
+const boardId = 123;
+
+const standardColumns = ['To Do', 'In Progress', 'Review', 'Done'];
+
+standardColumns.forEach((name, index) => {
+  columnService.createColumn({ boardId, name }).subscribe({
+    next: (column) => console.log(`Created: ${column.name}`),
+    error: (err) => console.error(`Failed to create ${name}:`, err)
+  });
+});
+```
+
+### Reordering Columns
+
+```typescript
+const columnService = inject(ColumnService);
+
+// Move column to the end
+columnService.moveColumn(456, 999).subscribe({
+  next: (column) => console.log('Moved to end:', column.position)
+});
+
+// Move column to the beginning
+columnService.moveColumn(789, 0).subscribe({
+  next: (column) => console.log('Moved to start:', column.position)
+});
+```

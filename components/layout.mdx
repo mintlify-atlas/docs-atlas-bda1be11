@@ -1,0 +1,119 @@
+---
+title: 'Layout Component'
+description: 'Main application layout component that provides the structural wrapper'
+icon: 'grid'
+---
+
+## Overview
+
+The `Layout` component serves as the main structural wrapper for the TaskFlow application. It composes the Header, Sidebar, and main content area (router outlet) into a cohesive layout structure.
+
+## Component Signature
+
+```typescript layout.ts
+import { Component } from '@angular/core';
+import { Header } from "../header/header";
+import { RouterOutlet } from '@angular/router';
+import { Sidebar } from "../sidebar/sidebar";
+
+@Component({
+  selector: 'app-layout',
+  imports: [Header, RouterOutlet, Sidebar],
+  templateUrl: './layout.html',
+  styleUrl: './layout.css',
+})
+export class Layout {
+
+}
+```
+
+## Template Structure
+
+The component uses a hierarchical layout structure:
+
+```html layout.html
+<div class="app-layout">
+  <app-header></app-header>
+  
+  <div class="main-area">
+    <app-sidebar></app-sidebar>
+    
+    <div class="content">
+      <router-outlet></router-outlet>
+    </div>
+  </div>
+</div>
+```
+
+## Usage
+
+The Layout component is typically used as the root layout wrapper in your routing configuration:
+
+```typescript app.routes.ts
+import { Routes } from '@angular/router';
+import { Layout } from './components/layout/layout/layout';
+
+export const routes: Routes = [
+  {
+    path: '',
+    component: Layout,
+    children: [
+      {
+        path: 'boards',
+        loadComponent: () => import('./pages/boards/boards').then(m => m.BoardsPage)
+      },
+      {
+        path: 'boards/:id',
+        loadComponent: () => import('./pages/board-detail/board-detail').then(m => m.BoardDetailPage)
+      }
+    ]
+  }
+];
+```
+
+## Layout Structure
+
+The Layout component creates a three-part structure:
+
+1. **Header**: Fixed at the top of the application
+2. **Sidebar**: Navigation sidebar on the left side
+3. **Content Area**: Main content area where routed components are rendered via `router-outlet`
+
+<Info>
+  The Layout component uses Angular's standalone component architecture with direct imports of Header, RouterOutlet, and Sidebar.
+</Info>
+
+## Styling
+
+The layout uses CSS Grid or Flexbox to create a responsive layout structure:
+
+- `.app-layout`: Root container for the entire layout
+- `.main-area`: Container for sidebar and content
+- `.content`: Main content area where routed views are displayed
+
+## Related Components
+
+<CardGroup cols={2}>
+  <Card title="Header" icon="window-frame-open" href="./header">
+    Top navigation bar component
+  </Card>
+  <Card title="Sidebar" icon="sidebar" href="./sidebar">
+    Navigation sidebar with board management
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use as root layout component">
+    The Layout component should be used at the root level of your routing configuration to provide consistent structure across all pages.
+  </Accordion>
+  
+  <Accordion title="Keep layout logic minimal">
+    The Layout component should focus purely on structure. Business logic and state management should be delegated to child components like Header and Sidebar.
+  </Accordion>
+  
+  <Accordion title="Leverage router-outlet">
+    Use Angular's router-outlet to dynamically load page components within the layout structure, enabling seamless navigation without full page reloads.
+  </Accordion>
+</AccordionGroup>

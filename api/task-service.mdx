@@ -1,0 +1,422 @@
+---
+title: 'TaskService'
+description: 'Service for managing tasks including creation, updates, deletion, and moving between columns'
+---
+
+## Overview
+
+The `TaskService` handles all task-related operations within the TaskFlow application. It provides methods to create, update, delete, and move tasks between columns. Tasks are the core work items in the board structure.
+
+## Import
+
+```typescript
+import { TaskService } from './services/task.service';
+import type { TaskItem } from './services/board.service';
+```
+
+## Interfaces
+
+### TaskItem
+
+Represents a task within a column. This interface is imported from `board.service.ts`.
+
+```typescript
+export interface TaskItem {
+  id: number;           // Unique task identifier
+  title: string;        // Task title
+  description: string;  // Task description/details
+}
+```
+
+## Methods
+
+### createTask()
+
+Creates a new task in a specified column.
+
+<ParamField path="data" type="object" required>
+  Task creation data
+  
+  <ParamField path="data.title" type="string" required>
+    The title of the task
+  </ParamField>
+  
+  <ParamField path="data.columnId" type="number" required>
+    The ID of the column where the task will be created
+  </ParamField>
+  
+  <ParamField path="data.description" type="string">
+    Optional description providing additional task details
+  </ParamField>
+</ParamField>
+
+**Returns:** `Observable<TaskItem>` - The newly created task
+
+**Implementation:**
+```typescript
+createTask(data: { title: string; columnId: number; description?: string }) {
+  return this.http.post<TaskItem>(this.apiUrl, data);
+}
+```
+
+**Usage Example:**
+```typescript
+const taskService = inject(TaskService);
+
+taskService.createTask({
+  title: 'Implement user authentication',
+  columnId: 123,
+  description: 'Add JWT-based authentication with login and registration'
+}).subscribe({
+  next: (task) => {
+    console.log('Task created:', task.title);
+    console.log('Task ID:', task.id);
+    console.log('Description:', task.description);
+  },
+  error: (error) => {
+    console.error('Failed to create task', error);
+  }
+});
+```
+
+---
+
+### updateTask()
+
+Updates an existing task's title and description.
+
+<ParamField path="id" type="number" required>
+  The task ID to update
+</ParamField>
+
+<ParamField path="data" type="object" required>
+  Task update data
+  
+  <ParamField path="data.title" type="string" required>
+    The new title for the task
+  </ParamField>
+  
+  <ParamField path="data.description" type="string" required>
+    The new description for the task
+  </ParamField>
+</ParamField>
+
+**Returns:** `Observable<TaskItem>` - The updated task
+
+**Implementation:**
+```typescript
+updateTask(id: number, data: { title: string; description: string }) {
+  return this.http.put<TaskItem>(`${this.apiUrl}/${id}`, data);
+}
+```
+
+**Usage Example:**
+```typescript
+const taskService = inject(TaskService);
+
+taskService.updateTask(456, {
+  title: 'Implement OAuth2 authentication',
+  description: 'Updated to use OAuth2 instead of JWT for better security'
+}).subscribe({
+  next: (task) => {
+    console.log('Task updated:', task.title);
+    console.log('New description:', task.description);
+  },
+  error: (error) => {
+    console.error('Failed to update task', error);
+  }
+});
+```
+
+---
+
+### deleteTask()
+
+Deletes a task permanently.
+
+<ParamField path="id" type="number" required>
+  The task ID to delete
+</ParamField>
+
+**Returns:** `Observable<any>`
+
+**Implementation:**
+```typescript
+deleteTask(id: number) {
+  return this.http.delete(`${this.apiUrl}/${id}`);
+}
+```
+
+**Usage Example:**
+```typescript
+const taskService = inject(TaskService);
+
+taskService.deleteTask(456).subscribe({
+  next: () => {
+    console.log('Task deleted successfully');
+  },
+  error: (error) => {
+    console.error('Failed to delete task', error);
+  }
+});
+```
+
+---
+
+### moveTask()
+
+Moves a task to a different column and/or position.
+
+<ParamField path="id" type="number" required>
+  The task ID to move
+</ParamField>
+
+<ParamField path="data" type="object" required>
+  Movement data
+  
+  <ParamField path="data.newColumnId" type="number" required>
+    The ID of the target column
+  </ParamField>
+  
+  <ParamField path="data.newPosition" type="number" required>
+    The target position within the column (0-indexed)
+  </ParamField>
+</ParamField>
+
+**Returns:** `Observable<any>`
+
+**Implementation:**
+```typescript
+moveTask(id: number, data: { newColumnId: number; newPosition: number }) {
+  return this.http.put(`${this.apiUrl}/${id}/move`, data);
+}
+```
+
+**Usage Example:**
+```typescript
+const taskService = inject(TaskService);
+
+// Move task to "In Progress" column at position 2
+taskService.moveTask(456, {
+  newColumnId: 789,
+  newPosition: 2
+}).subscribe({
+  next: () => {
+    console.log('Task moved successfully');
+  },
+  error: (error) => {
+    console.error('Failed to move task', error);
+  }
+});
+```
+
+## Configuration
+
+**API Endpoint:** `https://localhost:7057/api/task`
+
+**Provider:** Registered in root module (`providedIn: 'root'`)
+
+## Dependencies
+
+- `HttpClient` - For making HTTP requests to the backend API
+- `rxjs` - Uses `Observable` for reactive data streams
+- `TaskItem` interface from `board.service.ts`
+
+## Complete Example
+
+```typescript
+import { Component, inject, Input, OnInit } from '@angular/core';
+import { TaskService } from './services/task.service';
+import { TaskItem } from './services/board.service';
+import { CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
+
+@Component({
+  selector: 'app-task-list',
+  template: `
+    <div class="task-list">
+      <div class="task-header">
+        <h4>{{ columnName }}</h4>
+        <button (click)="addTask()">Add Task</button>
+      </div>
+      
+      <div cdkDropList 
+           [cdkDropListData]="tasks"
+           (cdkDropListDropped)="onTaskDrop($event)"
+           class="task-container">
+        <div *ngFor="let task of tasks" 
+             cdkDrag
+             class="task-card">
+          <h5>{{ task.title }}</h5>
+          <p>{{ task.description }}</p>
+          <div class="task-actions">
+            <button (click)="editTask(task)">Edit</button>
+            <button (click)="removeTask(task.id)">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `,
+  styles: [`
+    .task-list {
+      min-width: 300px;
+      background: #f9f9f9;
+      padding: 1rem;
+      border-radius: 8px;
+    }
+    .task-container {
+      min-height: 200px;
+    }
+    .task-card {
+      background: white;
+      padding: 1rem;
+      margin: 0.5rem 0;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+  `]
+})
+export class TaskListComponent implements OnInit {
+  @Input() columnId!: number;
+  @Input() columnName!: string;
+  @Input() tasks: TaskItem[] = [];
+  
+  private taskService = inject(TaskService);
+
+  addTask() {
+    const title = prompt('Enter task title:');
+    if (title) {
+      const description = prompt('Enter task description (optional):') || '';
+      
+      this.taskService.createTask({
+        title,
+        columnId: this.columnId,
+        description
+      }).subscribe({
+        next: (task) => {
+          console.log('Task created:', task);
+          this.tasks.push(task);
+        },
+        error: (err) => console.error('Error creating task:', err)
+      });
+    }
+  }
+
+  editTask(task: TaskItem) {
+    const title = prompt('Enter new title:', task.title);
+    const description = prompt('Enter new description:', task.description);
+    
+    if (title && description) {
+      this.taskService.updateTask(task.id, { title, description }).subscribe({
+        next: (updatedTask) => {
+          const index = this.tasks.findIndex(t => t.id === task.id);
+          if (index !== -1) {
+            this.tasks[index] = updatedTask;
+          }
+        },
+        error: (err) => console.error('Error updating task:', err)
+      });
+    }
+  }
+
+  removeTask(id: number) {
+    if (confirm('Delete this task?')) {
+      this.taskService.deleteTask(id).subscribe({
+        next: () => {
+          this.tasks = this.tasks.filter(t => t.id !== id);
+          console.log('Task deleted');
+        },
+        error: (err) => console.error('Error deleting task:', err)
+      });
+    }
+  }
+
+  onTaskDrop(event: CdkDragDrop<TaskItem[]>) {
+    if (event.previousContainer === event.container) {
+      // Reorder within same column
+      moveItemInArray(
+        event.container.data,
+        event.previousIndex,
+        event.currentIndex
+      );
+    } else {
+      // Move to different column
+      const task = event.previousContainer.data[event.previousIndex];
+      
+      this.taskService.moveTask(task.id, {
+        newColumnId: this.columnId,
+        newPosition: event.currentIndex
+      }).subscribe({
+        next: () => {
+          transferArrayItem(
+            event.previousContainer.data,
+            event.container.data,
+            event.previousIndex,
+            event.currentIndex
+          );
+          console.log('Task moved successfully');
+        },
+        error: (err) => console.error('Error moving task:', err)
+      });
+    }
+  }
+}
+```
+
+## Common Workflows
+
+### Creating Multiple Tasks
+
+```typescript
+const taskService = inject(TaskService);
+const columnId = 123;
+
+const tasks = [
+  { title: 'Design mockups', description: 'Create UI mockups in Figma' },
+  { title: 'Setup database', description: 'Configure PostgreSQL database' },
+  { title: 'Write API docs', description: 'Document all API endpoints' }
+];
+
+tasks.forEach(task => {
+  taskService.createTask({ ...task, columnId }).subscribe({
+    next: (created) => console.log(`Created: ${created.title}`),
+    error: (err) => console.error(`Failed to create ${task.title}:`, err)
+  });
+});
+```
+
+### Moving Task Through Workflow
+
+```typescript
+const taskService = inject(TaskService);
+const taskId = 456;
+
+// Move from "To Do" to "In Progress"
+taskService.moveTask(taskId, {
+  newColumnId: 200, // In Progress column
+  newPosition: 0     // Top of the list
+}).subscribe({
+  next: () => console.log('Task started')
+});
+
+// Later, move to "Done"
+taskService.moveTask(taskId, {
+  newColumnId: 300, // Done column
+  newPosition: 0
+}).subscribe({
+  next: () => console.log('Task completed')
+});
+```
+
+### Bulk Delete Tasks
+
+```typescript
+const taskService = inject(TaskService);
+const taskIds = [101, 102, 103, 104];
+
+taskIds.forEach(id => {
+  taskService.deleteTask(id).subscribe({
+    next: () => console.log(`Deleted task ${id}`),
+    error: (err) => console.error(`Failed to delete task ${id}:`, err)
+  });
+});
+```

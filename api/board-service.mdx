@@ -1,0 +1,410 @@
+---
+title: 'BoardService'
+description: 'Service for managing boards, including creation, retrieval, updates, and deletion'
+---
+
+## Overview
+
+The `BoardService` manages all board-related operations in the TaskFlow application. It handles board CRUD operations, board joining via join codes, and retrieves board data with associated columns and tasks.
+
+## Import
+
+```typescript
+import { BoardService } from './services/board.service';
+import type { Board, BoardSummary, TaskColumn, TaskItem } from './services/board.service';
+```
+
+## Interfaces
+
+### TaskItem
+
+Represents an individual task within a column.
+
+```typescript
+export interface TaskItem {
+  id: number;           // Unique task identifier
+  title: string;        // Task title
+  description: string;  // Task description
+}
+```
+
+### TaskColumn
+
+Represents a column containing multiple tasks.
+
+```typescript
+export interface TaskColumn {
+  id: number;           // Unique column identifier
+  name: string;         // Column name
+  tasks: TaskItem[];    // Array of tasks in this column
+}
+```
+
+### Board
+
+Represents a complete board with all its columns and tasks.
+
+```typescript
+export interface Board {
+  id: number;              // Unique board identifier
+  name: string;            // Board name
+  joinCode: string;        // Code for joining the board
+  columns: TaskColumn[];   // Array of columns in this board
+}
+```
+
+### BoardSummary
+
+Represents a lightweight board object without columns and tasks.
+
+```typescript
+export interface BoardSummary {
+  id: number;        // Unique board identifier
+  name: string;      // Board name
+  joinCode: string;  // Code for joining the board
+}
+```
+
+## Methods
+
+### getMyBoards()
+
+Retrieves all boards associated with the current user.
+
+**Returns:** `Observable<BoardSummary[]>` - Array of board summaries
+
+**Implementation:**
+```typescript
+getMyBoards(): Observable<BoardSummary[]> {
+  return this.http.get<BoardSummary[]>(`${this.apiUrl}/my`);
+}
+```
+
+**Usage Example:**
+```typescript
+const boardService = inject(BoardService);
+
+boardService.getMyBoards().subscribe({
+  next: (boards) => {
+    console.log('My boards:', boards);
+    boards.forEach(board => {
+      console.log(`Board: ${board.name} (Code: ${board.joinCode})`);
+    });
+  },
+  error: (error) => {
+    console.error('Failed to fetch boards', error);
+  }
+});
+```
+
+---
+
+### getBoard()
+
+Retrieves detailed information about a specific board including all columns and tasks.
+
+<ParamField path="id" type="string" required>
+  The board ID to retrieve
+</ParamField>
+
+**Returns:** `Observable<Board>` - Complete board object with columns and tasks
+
+**Implementation:**
+```typescript
+getBoard(id: string): Observable<Board> {
+  return this.http.get<Board>(`${this.apiUrl}/${id}`);
+}
+```
+
+**Usage Example:**
+```typescript
+const boardService = inject(BoardService);
+
+boardService.getBoard('123').subscribe({
+  next: (board) => {
+    console.log('Board:', board.name);
+    console.log('Columns:', board.columns.length);
+    board.columns.forEach(column => {
+      console.log(`Column: ${column.name} has ${column.tasks.length} tasks`);
+    });
+  },
+  error: (error) => {
+    console.error('Failed to fetch board', error);
+  }
+});
+```
+
+---
+
+### createBoard()
+
+Creates a new board.
+
+<ParamField path="data" type="object" required>
+  Board creation data
+  
+  <ParamField path="data.name" type="string" required>
+    The name for the new board
+  </ParamField>
+</ParamField>
+
+**Returns:** `Observable<BoardSummary>` - The newly created board summary
+
+**Implementation:**
+```typescript
+createBoard(data: { name: string }) {
+  return this.http.post<BoardSummary>(
+    `${this.apiUrl}`,
+    data
+  );
+}
+```
+
+**Usage Example:**
+```typescript
+const boardService = inject(BoardService);
+
+boardService.createBoard({ name: 'Sprint Planning Q1 2026' }).subscribe({
+  next: (board) => {
+    console.log('Board created:', board.name);
+    console.log('Join code:', board.joinCode);
+    console.log('Board ID:', board.id);
+  },
+  error: (error) => {
+    console.error('Failed to create board', error);
+  }
+});
+```
+
+---
+
+### deleteBoard()
+
+Deletes a board permanently.
+
+<ParamField path="id" type="number" required>
+  The board ID to delete
+</ParamField>
+
+**Returns:** `Observable<any>`
+
+**Implementation:**
+```typescript
+deleteBoard(id: number) {
+  return this.http.delete(`${this.apiUrl}/${id}`);
+}
+```
+
+**Usage Example:**
+```typescript
+const boardService = inject(BoardService);
+
+boardService.deleteBoard(123).subscribe({
+  next: () => {
+    console.log('Board deleted successfully');
+  },
+  error: (error) => {
+    console.error('Failed to delete board', error);
+  }
+});
+```
+
+---
+
+### updateBoard()
+
+Updates a board's name.
+
+<ParamField path="id" type="number" required>
+  The board ID to update
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  The new name for the board
+</ParamField>
+
+**Returns:** `Observable<BoardSummary>` - The updated board summary
+
+**Implementation:**
+```typescript
+updateBoard(id: number, name: string) {
+  return this.http.put<BoardSummary>(`${this.apiUrl}/${id}`, {
+    name
+  });
+}
+```
+
+**Usage Example:**
+```typescript
+const boardService = inject(BoardService);
+
+boardService.updateBoard(123, 'Updated Board Name').subscribe({
+  next: (board) => {
+    console.log('Board updated:', board.name);
+  },
+  error: (error) => {
+    console.error('Failed to update board', error);
+  }
+});
+```
+
+---
+
+### joinBoard()
+
+Joins an existing board using a join code.
+
+<ParamField path="data" type="object" required>
+  Join data
+  
+  <ParamField path="data.joinCode" type="string" required>
+    The join code for the board
+  </ParamField>
+</ParamField>
+
+**Returns:** `Observable<BoardSummary>` - The joined board summary
+
+**Implementation:**
+```typescript
+joinBoard(data: { joinCode: string }) {
+  return this.http.post<BoardSummary>(
+    `${this.apiUrl}/join`,
+    data
+  );
+}
+```
+
+**Usage Example:**
+```typescript
+const boardService = inject(BoardService);
+
+boardService.joinBoard({ joinCode: 'ABC123' }).subscribe({
+  next: (board) => {
+    console.log('Successfully joined board:', board.name);
+    console.log('Board ID:', board.id);
+  },
+  error: (error) => {
+    console.error('Failed to join board', error);
+  }
+});
+```
+
+## Configuration
+
+**API Endpoint:** `https://localhost:7057/api/board`
+
+**Provider:** Registered in root module (`providedIn: 'root'`)
+
+## Dependencies
+
+- `HttpClient` - For making HTTP requests to the backend API
+- `rxjs` - Uses `Observable` for reactive data streams
+
+## Complete Example
+
+```typescript
+import { Component, inject, OnInit } from '@angular/core';
+import { BoardService, Board, BoardSummary } from './services/board.service';
+
+@Component({
+  selector: 'app-board-manager',
+  template: `
+    <div class="board-manager">
+      <h2>My Boards</h2>
+      <button (click)="createNewBoard()">Create Board</button>
+      <button (click)="joinBoardWithCode()">Join Board</button>
+      
+      <ul>
+        <li *ngFor="let board of boards">
+          {{ board.name }}
+          <button (click)="viewBoard(board.id)">View</button>
+          <button (click)="renameBoard(board.id)">Rename</button>
+          <button (click)="removeBoard(board.id)">Delete</button>
+        </li>
+      </ul>
+      
+      <div *ngIf="currentBoard">
+        <h3>{{ currentBoard.name }}</h3>
+        <p>Join Code: {{ currentBoard.joinCode }}</p>
+        <div *ngFor="let column of currentBoard.columns">
+          <h4>{{ column.name }}</h4>
+          <p>{{ column.tasks.length }} tasks</p>
+        </div>
+      </div>
+    </div>
+  `
+})
+export class BoardManagerComponent implements OnInit {
+  private boardService = inject(BoardService);
+  
+  boards: BoardSummary[] = [];
+  currentBoard: Board | null = null;
+
+  ngOnInit() {
+    this.loadBoards();
+  }
+
+  loadBoards() {
+    this.boardService.getMyBoards().subscribe({
+      next: (boards) => {
+        this.boards = boards;
+      },
+      error: (err) => console.error('Error loading boards:', err)
+    });
+  }
+
+  createNewBoard() {
+    const name = prompt('Enter board name:');
+    if (name) {
+      this.boardService.createBoard({ name }).subscribe({
+        next: (board) => {
+          console.log('Board created:', board);
+          this.loadBoards();
+        },
+        error: (err) => console.error('Error creating board:', err)
+      });
+    }
+  }
+
+  viewBoard(id: number) {
+    this.boardService.getBoard(id.toString()).subscribe({
+      next: (board) => {
+        this.currentBoard = board;
+      },
+      error: (err) => console.error('Error loading board:', err)
+    });
+  }
+
+  renameBoard(id: number) {
+    const name = prompt('Enter new name:');
+    if (name) {
+      this.boardService.updateBoard(id, name).subscribe({
+        next: () => this.loadBoards(),
+        error: (err) => console.error('Error updating board:', err)
+      });
+    }
+  }
+
+  removeBoard(id: number) {
+    if (confirm('Delete this board?')) {
+      this.boardService.deleteBoard(id).subscribe({
+        next: () => this.loadBoards(),
+        error: (err) => console.error('Error deleting board:', err)
+      });
+    }
+  }
+
+  joinBoardWithCode() {
+    const joinCode = prompt('Enter join code:');
+    if (joinCode) {
+      this.boardService.joinBoard({ joinCode }).subscribe({
+        next: (board) => {
+          console.log('Joined board:', board);
+          this.loadBoards();
+        },
+        error: (err) => console.error('Error joining board:', err)
+      });
+    }
+  }
+}
+```
