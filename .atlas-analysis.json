@@ -1,0 +1,86 @@
+{
+  "projectType": "frontend",
+  "projectName": "TaskFlow Angular",
+  "projectDescription": "A Kanban-style project management application built with Angular standalone components and signals",
+  "theme": "palm",
+  "primaryColor": "#3b82f6",
+  "lightColor": "#60a5fa",
+  "darkColor": "#2563eb",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart", "installation"]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": ["core/architecture", "core/authentication", "core/state-management"]
+          },
+          {
+            "group": "Guides",
+            "pages": ["guides/boards", "guides/columns", "guides/tasks", "guides/drag-and-drop"]
+          }
+        ]
+      },
+      {
+        "tab": "Components",
+        "groups": [
+          {
+            "group": "Layout Components",
+            "pages": ["components/layout", "components/header", "components/sidebar"]
+          },
+          {
+            "group": "Board Components",
+            "pages": ["components/column", "components/task-card", "components/task-modal"]
+          },
+          {
+            "group": "UI Components",
+            "pages": ["components/confirm-modal"]
+          }
+        ]
+      },
+      {
+        "tab": "API",
+        "groups": [
+          {
+            "group": "Services",
+            "pages": ["api/auth-service", "api/board-service", "api/column-service", "api/task-service"]
+          },
+          {
+            "group": "Guards & Interceptors",
+            "pages": ["api/auth-guard", "api/auth-interceptor"]
+          },
+          {
+            "group": "Types & Interfaces",
+            "pages": ["api/types"]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Angular standalone components with signals",
+    "JWT authentication with route guards",
+    "Kanban board management with drag & drop",
+    "Real-time task and column organization",
+    "Collaborative board sharing with join codes"
+  ],
+  "publicApiSurface": [
+    "AuthService",
+    "BoardService",
+    "ColumnService",
+    "TaskService",
+    "authGuard",
+    "authInterceptor",
+    "Layout",
+    "Header",
+    "Sidebar",
+    "ColumnComponent",
+    "TaskCard",
+    "TaskModal",
+    "ConfirmModal"
+  ]
+}
